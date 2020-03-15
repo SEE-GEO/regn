@@ -45,7 +45,7 @@ Enable HTTPS
 You should https to log on to your notebook server to avoid your password
 being sent in clear text. Todo so you need to setup a certificate:
 
-.. code_block:: bash
+.. code-block:: bash
    
     openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout ~/.jupyter/mykey.key -out ~/.jupyter/mycert.pem
 
@@ -70,7 +70,7 @@ computer and to use the SSL certificate created above.
 
 The server should now start up and print the IP and port it is listening to.
 
-.. code-blck:: bash
+.. code-block:: bash
 
    [I 16:04:00.182 NotebookApp] The Jupyter Notebook is running at:
    [I 16:04:00.182 NotebookApp] https://<your_computer_name>.rss.chalmers.se:8888/
