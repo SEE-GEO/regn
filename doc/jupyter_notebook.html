@@ -1,0 +1,335 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Remote access to jupyter notebooks &mdash; REGN 0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Data" href="data.html" />
+    <link rel="prev" title="Required software" href="dependencies.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> REGN
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="dependencies.html">Required software</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Remote access to jupyter notebooks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#setting-up-jupyter">Setting up jupyter</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#setup-a-password">Setup a password</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#enable-https">Enable HTTPS</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#starting-jupyter">Starting jupyter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#accessing-the-server">Accessing the server</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#accelerating-server-start-up">Accelerating server start-up</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#alternative-ssh-port-forwarding">Alternative: SSH port forwarding</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption"><span class="caption-text">REGN</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="data.html">Data</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">REGN</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Remote access to jupyter notebooks</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/jupyter_notebook.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="remote-access-to-jupyter-notebooks">
+<h1>Remote access to jupyter notebooks<a class="headerlink" href="#remote-access-to-jupyter-notebooks" title="Permalink to this headline">¶</a></h1>
+<p>Jupyter notebooks are extremely convenient to work with in a remote
+setting. This short manual explains how to setup a persistent
+server running on a <strong>remote machine</strong> (e.g. you machine at work) so that
+you can access it from a browser on your <strong>local machine</strong> (e.g. your
+laptop at home).</p>
+<div class="section" id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Permalink to this headline">¶</a></h2>
+<p>We will make use of the following tools:</p>
+<ol class="arabic simple">
+<li><p><code class="code docutils literal notranslate"><span class="pre">ssh</span></code>: I assume that you have an ssh-client on your laptop that
+allows you to log into your remote machine.</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">tmux</span></code>: <a class="reference external" href="https://github.com/tmux/tmux/wiki">tmux</a> allows
+running a server in a detached process so that it is not shut down
+when we log out of our ssh session.</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">jupyter</span></code>: Quite obviously, we will make use of <a class="reference external" href="https://jupyter.org/">jupyter notebooks</a>.</p></li>
+</ol>
+<p>Make sure to install these tools if you haven’t done so already.</p>
+</div>
+<div class="section" id="setting-up-jupyter">
+<h2>Setting up jupyter<a class="headerlink" href="#setting-up-jupyter" title="Permalink to this headline">¶</a></h2>
+<p>First, we need to perform some configurations on your <strong>remote machine</strong> to enable
+a secure connection to the notebook server. To do so, execute the following steps
+on the <strong>remote machine</strong>:</p>
+<div class="section" id="setup-a-password">
+<h3>Setup a password<a class="headerlink" href="#setup-a-password" title="Permalink to this headline">¶</a></h3>
+<p>Setup a password to access your jupyter notebook server by running the following
+on the command line. The command will prompt you to enter a secure password.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>jupyter notebook password
+</pre></div>
+</div>
+</div>
+<div class="section" id="enable-https">
+<h3>Enable HTTPS<a class="headerlink" href="#enable-https" title="Permalink to this headline">¶</a></h3>
+<p>You should use https to log on to your notebook server to avoid your password
+being sent in clear text. Todo so you need to setup a certificate:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout ~/.jupyter/mykey.key -out ~/.jupyter/mycert.pem
+</pre></div>
+</div>
+<p>The command will prompt you to enter a number of descriptive fields. It is sufficient to
+just enter your email in the last field and leave the rest blank.</p>
+</div>
+</div>
+<div class="section" id="starting-jupyter">
+<h2>Starting jupyter<a class="headerlink" href="#starting-jupyter" title="Permalink to this headline">¶</a></h2>
+<p>First, open a new tmux window by issuing the <code class="code docutils literal notranslate"><span class="pre">tmux</span></code> command from the
+command line. You can skip this step and jump directly to the second, but then
+your server will not be persistent when you log out from your current ssh
+session.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tmux
+</pre></div>
+</div>
+<p>Now start the jupyter notebook server. To be able to connect to the server from your
+<strong>remote machine</strong>, we have to tell the server to listen to your public IP. This
+is what <code class="code docutils literal notranslate"><span class="pre">--ip=\`hostname</span> <span class="pre">-i\`</span></code> does. To enable connecting via https, we also
+need to provide paths to the certificate and key files we have created.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`hostname -i`
+</pre></div>
+</div>
+<p>The server should now start up and print the IP and port it is listening to.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>[I 16:04:00.182 NotebookApp] The Jupyter Notebook is running at:
+[I 16:04:00.182 NotebookApp] https://&lt;your_computer_name&gt;.rss.chalmers.se:8888/
+</pre></div>
+</div>
+<p>By default the server will listen to port 8888 but if you have other notebooks
+running it will use the next higher one until it finds a free port.
+<code class="code docutils literal notranslate"><span class="pre">&lt;your_computer_name&gt;</span></code> is the name of your computer that you use to log on
+also via ssh. Alternatively you can use the public IP address of your computer.
+You can find out the public IP of your computer by running <code class="code docutils literal notranslate"><span class="pre">hostname</span> <span class="pre">-i</span></code>
+from the command line.</p>
+<p>You can now detach from the tmux window using the key combination
+<code class="code docutils literal notranslate"><span class="pre">CTRL</span> <span class="pre">+</span> <span class="pre">b</span></code> followed by <code class="code docutils literal notranslate"><span class="pre">d</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>After detaching from the <code class="code docutils literal notranslate"><span class="pre">tmux</span></code> window, you can list active windows using
+<code class="code docutils literal notranslate"><span class="pre">tmux</span> <span class="pre">ls</span></code> and then reattach to one of them using <code class="code docutils literal notranslate"><span class="pre">tmux</span> <span class="pre">a</span> <span class="pre">-t</span> <span class="pre">&lt;window_name&gt;</span></code>.</p>
+</div>
+</div>
+<div class="section" id="accessing-the-server">
+<h2>Accessing the server<a class="headerlink" href="#accessing-the-server" title="Permalink to this headline">¶</a></h2>
+<p>You can now connect to your jupyter server from the browser running on your
+<strong>local computer</strong> by navigating to <code class="code docutils literal notranslate"><span class="pre">&lt;your_computer_name&gt;.rss.chalmers.se:8888</span></code>
+in your browser. Your browser will likely print a security warning because we
+had to setup the SSL certificate ourselves, but you can safely ignore it.</p>
+</div>
+<div class="section" id="accelerating-server-start-up">
+<h2>Accelerating server start-up<a class="headerlink" href="#accelerating-server-start-up" title="Permalink to this headline">¶</a></h2>
+<p>To start up a server with a single command, you can combine the above commands
+into an alias. To do this add the following to your <code class="code docutils literal notranslate"><span class="pre">~/.bashrc</span></code> file:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>alias start_jupyter_server=&quot;tmux new-session -d -s jupyter_notebook &#39;jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`hostname -i`&#39;&quot;
+</pre></div>
+</div>
+</div>
+<div class="section" id="alternative-ssh-port-forwarding">
+<h2>Alternative: SSH port forwarding<a class="headerlink" href="#alternative-ssh-port-forwarding" title="Permalink to this headline">¶</a></h2>
+<p>As an alternative to starting a server listening on the public IP address of
+your computer, you can forward a local port from your <strong>remote machine</strong> via
+ssh. For example, if you start a server on your remote machine without the
+<code class="code docutils literal notranslate"><span class="pre">--ip</span></code> argument, it will listen on <code class="code docutils literal notranslate"><span class="pre">localhost:8888</span></code>. You can access
+the server by forwarding port <code class="code docutils literal notranslate"><span class="pre">8888</span></code> from your <strong>remote machine</strong> to your
+local one using an ssh tunnel. The general syntax for ssh port forwarding is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ssh</span> <span class="o">-</span><span class="n">L</span> <span class="o">&lt;</span><span class="n">local_port</span><span class="o">&gt;</span><span class="p">:</span><span class="n">localhost</span><span class="p">:</span><span class="o">&lt;</span><span class="n">remote_port</span><span class="o">&gt;</span> <span class="o">&lt;</span><span class="n">your_computer_name</span><span class="o">&gt;.</span><span class="n">rss</span><span class="o">.</span><span class="n">chalmers</span><span class="o">.</span><span class="n">se</span>
+</pre></div>
+</div>
+<p>For example to forward local port <code class="code docutils literal notranslate"><span class="pre">8888</span></code> from your <strong>remote  machine</strong> to port
+<code class="code docutils literal notranslate"><span class="pre">8888</span></code> of your laptop:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ssh</span> <span class="o">-</span><span class="n">L</span> <span class="mi">8888</span><span class="p">:</span><span class="n">localhost</span><span class="p">:</span><span class="mi">8888</span> <span class="o">&lt;</span><span class="n">remote_ip</span><span class="o">&gt;</span>
+</pre></div>
+</div>
+<p>You can then access the server from your laptop by navigating to
+<cite>localhost:8888 localhost:8888</cite> in your browser. You will have to
+keep the ssh connection open as long as you want to access the server.
+Note also that when your notebook server is listening on another port
+than <code class="code docutils literal notranslate"><span class="pre">8888</span></code> your will have to adapt the <code class="code docutils literal notranslate"><span class="pre">&lt;remote_port&gt;</span></code> argument
+accordingly.</p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="data.html" class="btn btn-neutral float-right" title="Data" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="dependencies.html" class="btn btn-neutral float-left" title="Required software" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2020, Simon Pfreundschuh, Inderpreet Kaur, Patrick Eriksson
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
