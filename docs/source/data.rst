@@ -1,5 +1,12 @@
 Data
 ====
 
-We have training and test data available from the GPM core observatory (CO)
-as well as the MHS satellite.
+We currently have two different datasets to work with: The GMI dataset and the
+MHS dataset. The GMI dataset consists of co-located observations from the
+Dual-Frequency Precipitation Radar (`DPR
+<https://pmm.nasa.gov/GPM/flight-project/DPR>`) and the GPM Microwave Imager
+(`GMI <https://pmm.nasa.gov/gpm/flight-project/gmi>_`) both flown on the GPM
+Core Observatory satellite. The MHS dataset consists of simulated observations
+from the Microwave humidity sounder (`MHS <https://wdc.dlr.de/sensors/mhs/>`)
+onboard the MetOp-A satellites based on DPR measurements.
+
