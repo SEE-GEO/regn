@@ -21,10 +21,10 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/language_data.js"></script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+        <script type="text/javascript" src="_static/language_data.js"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
@@ -85,6 +85,7 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Required software</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#typhon">Typhon</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#pytorch">Pytorch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#regn">regn</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="jupyter_notebook.html">Remote access to jupyter notebooks</a></li>
@@ -167,8 +168,8 @@ Python 3 and <code class="code docutils literal notranslate"><span class="pre">p
 of QRNNs. Since the work we are doing here will likely
 depend on new features added to typhon, you have to
 install the development version.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git clone https://github.com/atmtools/typhon
-<span class="nb">cd</span> typhon
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>git clone https://github.com/atmtools/typhon
+cd typhon
 pip install -e .
 </pre></div>
 </div>
@@ -176,8 +177,17 @@ pip install -e .
 <div class="section" id="pytorch">
 <h2>Pytorch<a class="headerlink" href="#pytorch" title="Permalink to this headline">¶</a></h2>
 <p>We will use the <code class="code docutils literal notranslate"><span class="pre">pytorch</span></code> deep-learning package as backend
-for neural networks. To install it, simply follow the instruction
+for neural networks. To install it, simply follow the instructions
 at <a class="reference external" href="https://pytorch.org/">pytorch.org</a>.</p>
+</div>
+<div class="section" id="regn">
+<h2>regn<a class="headerlink" href="#regn" title="Permalink to this headline">¶</a></h2>
+<p>This repository is itself a Python package which we will use to collect
+code that we will write. To install it navigate to the top-level directory
+and install it using</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pip install -e .
+</pre></div>
+</div>
 </div>
 </div>
 

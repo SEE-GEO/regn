@@ -21,10 +21,10 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/language_data.js"></script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+        <script type="text/javascript" src="_static/language_data.js"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
@@ -92,7 +92,7 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#starting-jupyter">Starting jupyter</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#accessing-the-server">Accessing the server</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#accelerating-server-start-up">Accelerating server start-up</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#single-command-for-server-start-up">Single command for server start-up</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#alternative-ssh-port-forwarding">Alternative: SSH port forwarding</a></li>
 </ul>
 </li>
@@ -250,13 +250,14 @@ from the command line.</p>
 in your browser. Your browser will likely print a security warning because we
 had to setup the SSL certificate ourselves, but you can safely ignore it.</p>
 </div>
-<div class="section" id="accelerating-server-start-up">
-<h2>Accelerating server start-up<a class="headerlink" href="#accelerating-server-start-up" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="single-command-for-server-start-up">
+<h2>Single command for server start-up<a class="headerlink" href="#single-command-for-server-start-up" title="Permalink to this headline">¶</a></h2>
 <p>To start up a server with a single command, you can combine the above commands
 into an alias. To do this add the following to your <code class="code docutils literal notranslate"><span class="pre">~/.bashrc</span></code> file:</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>alias start_jupyter_server=&quot;tmux new-session -d -s jupyter_notebook &#39;jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`hostname -i`&#39;&quot;
 </pre></div>
 </div>
+<p>You can then start a jupyter notebook server by simply issuing <code class="code docutils literal notranslate"><span class="pre">start_jupyter_server</span></code> on the command line.</p>
 </div>
 <div class="section" id="alternative-ssh-port-forwarding">
 <h2>Alternative: SSH port forwarding<a class="headerlink" href="#alternative-ssh-port-forwarding" title="Permalink to this headline">¶</a></h2>

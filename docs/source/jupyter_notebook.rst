@@ -104,8 +104,8 @@ You can now connect to your jupyter server from the browser running on your
 in your browser. Your browser will likely print a security warning because we
 had to setup the SSL certificate ourselves, but you can safely ignore it.
 
-Accelerating server start-up
-----------------------------
+Single command for server start-up
+----------------------------------
 
 To start up a server with a single command, you can combine the above commands
 into an alias. To do this add the following to your :code:`~/.bashrc` file:
@@ -113,6 +113,8 @@ into an alias. To do this add the following to your :code:`~/.bashrc` file:
 .. code-block:: none
 
   alias start_jupyter_server="tmux new-session -d -s jupyter_notebook 'jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`hostname -i`'"
+
+You can then start a jupyter notebook server by simply issuing :code:`start_jupyter_server` on the command line.
 
 Alternative: SSH port forwarding
 --------------------------------
