@@ -1,4 +1,4 @@
-Remote access to Jupyter Notebooks
+Remote access to jupyter notebooks
 ==================================
 
 Jupyter notebooks are extremely convenient to work with in a remote
@@ -14,11 +14,11 @@ We will make use of the following tools:
 
 1. ssh: I assumed that you have an ssh-client on your laptop that
    allows you to log into your remote machine.
-2. `tmux https://github.com/tmux/tmux/wiki`: :code:`tmux` allows
+2. `tmux <https://github.com/tmux/tmux/wiki>`_: :code:`tmux` allows
    to run a server in a detached process. This allows us to start
    a server via :code:`ssh` and to keep it running even after we
    have logged back out.
-3. Jupyter: Quite obviously we will make use of `jupyter https://jupyter.org/`.
+3. jupyter: Quite obviously we will make use of `jupyter notebooks <https://jupyter.org/>`_.
 
 Make sure to install these tools if you haven't done so already.
 
@@ -27,34 +27,37 @@ Setting up jupyter
 
 First, we need to perform some configurations on your remote machine to ensure
 a secure connection to the notebook server. To do so, execute the following steps
-on your remote machine:
+on the remote machine:
 
 Setup a password
 ^^^^^^^^^^^^^^^^
 
-Setup a password to access your jupyter server by running the following on
-your terminal and entering a secure password.
+Setup a password to access your jupyter notebook server by running the following
+on the command line and entering a secure password.
 
 .. code-block:: bash
 
-   jupyter notebook password
+jupyter notebook password
 
 Enable HTTPS
 ^^^^^^^^^^^^
 
-You should https to log on to your notebook server to avoid your password
+You should use https to log on to your notebook server to avoid your password
 being sent in clear text. Todo so you need to setup a certificate:
 
 .. code-block:: bash
    
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout ~/.jupyter/mykey.key -out ~/.jupyter/mycert.pem
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout ~/.jupyter/mykey.key -out ~/.jupyter/mycert.pem
+
+The command will prompt you to enter a number of descriptive fields, it sufficient if
+you just enter your name and email address and leave the rest blank.
 
 Starting jupyter
 ----------------
 
 First, open a new tmux window by issuing the :code:`tmux` command from the
-command line. You can of course skip this step and jump to the second
-stop, but then it will be killed when you log out from your ssh session.
+command line. You can of course skip this step and jump to the second stop, but
+then your server will be killed when you log out from your ssh session.
 
 
 .. code-block:: bash
@@ -62,7 +65,7 @@ stop, but then it will be killed when you log out from your ssh session.
 
 
 Now start the jupyter notebook server and tell it to listen on the public IP of your
-computer and to use the SSL certificate created above.
+computer and to use the SSL certificate and key created above.
 
 .. code-block:: bash
 
@@ -70,10 +73,10 @@ computer and to use the SSL certificate created above.
 
 The server should now start up and print the IP and port it is listening to.
 
-.. code-block:: bash
+.. code-block::
 
-   [I 16:04:00.182 NotebookApp] The Jupyter Notebook is running at:
-   [I 16:04:00.182 NotebookApp] https://<your_computer_name>.rss.chalmers.se:8888/
+[I 16:04:00.182 NotebookApp] The Jupyter Notebook is running at:
+[I 16:04:00.182 NotebookApp] https://<your_computer_name>.rss.chalmers.se:8888/
 
 By default the server will listen to port 8888 but if you have other notebooks
 running it will use the next higher one until it finds a free port.
@@ -82,7 +85,7 @@ also via ssh. Alternatively you can use the public IP address of your
 computer. To find out the public IP of your computer simply run :code:`hostname -i`
 from the command line.
 
-You can now detach from the tmux window using the key combination typing
+You can now detach from the tmux window using the key combination
 :code:`CTRL + b` followed by :code:`d`.
 
 Accessing the server
@@ -100,6 +103,7 @@ To start up a server with a single command, you can combine the above commands
 into an alias. To do this add the following to your :code:`~/.bashrc` file:
 
 .. code-block:: bash
+
 alias start_jupyter_server=tmux new-session -d -s jupyter_notebook 'jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`hostname -i`'
 
 Alternative: SSH port forwarding
@@ -112,7 +116,7 @@ example, if you started a server on your remote machine listening on
 laptop to the local port on the remote machine:
 
 .. code-block:: bash
-   ssh -L 8888:localhost:8889 <your_computer_name>.rss.chalmers.se
+ssh -L 8888:localhost:8889 <your_computer_name>.rss.chalmers.se
 
 You can the access the server from your laptop by navigating to
 `localhost:8888 localhost:8888` in your browser. Note that you will have to
