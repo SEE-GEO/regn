@@ -21,10 +21,10 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-        <script type="text/javascript" src="_static/language_data.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
@@ -86,7 +86,12 @@
 </ul>
 <p class="caption"><span class="caption-text">REGN</span></p>
 <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Data</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Data</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#documentation">Documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#input-data">Input data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#surface-types">Surface types</a></li>
+</ul>
+</li>
 </ul>
 
             
@@ -153,14 +158,148 @@
             
   <div class="section" id="data">
 <h1>Data<a class="headerlink" href="#data" title="Permalink to this headline">¶</a></h1>
+<p>The input data that we are using is the same that is used to build the
+retrieval databases for the current version of the GPROF algorithm. For
+each sensor in the GPM constellation a separate retrieval database is
+constructed.</p>
 <p>We currently have two different datasets to work with: The GMI dataset and the
 MHS dataset. The GMI dataset consists of co-located observations from the
-Dual-Frequency Precipitation Radar (<cite>DPR
-&lt;https://pmm.nasa.gov/GPM/flight-project/DPR&gt;</cite>) and the GPM Microwave Imager
-(<cite>GMI &lt;https://pmm.nasa.gov/gpm/flight-project/gmi&gt;_</cite>) both flown on the GPM
+Dual-Frequency Precipitation Radar (<a class="reference external" href="https://pmm.nasa.gov/GPM/flight-project/DPR">DPR</a>) and the GPM Microwave Imager
+(<a class="reference external" href="https://pmm.nasa.gov/gpm/flight-project/gmi">GMI</a>) both flown on the GPM
 Core Observatory satellite. The MHS dataset consists of simulated observations
-from the Microwave humidity sounder (<cite>MHS &lt;https://wdc.dlr.de/sensors/mhs/&gt;</cite>)
+from the Microwave humidity sounder (<a class="reference external" href="https://wdc.dlr.de/sensors/mhs/">MHS</a>)
 onboard the MetOp-A satellites based on DPR measurements.</p>
+<div class="section" id="documentation">
+<h2>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h2>
+<p>Although the data that we are using does not stem from an official product, it
+the documentation for the GPM data products can be helpful. In particular the
+algorithm theoretical basis document (ATBD) for the <a class="reference external" href="https://pmm.nasa.gov/sites/default/files/document_files/GPROF_ATBD_GPM_Aug1_2014.pdf">GPROF algorithm</a>
+and the file format specification for all <a class="reference external" href="ftp://gpmweb2.pps.eosdis.nasa.gov/pub/GPMfilespec/filespec.GPM.pdf">GPM products</a> can be
+helpful.</p>
+</div>
+<div class="section" id="input-data">
+<h2>Input data<a class="headerlink" href="#input-data" title="Permalink to this headline">¶</a></h2>
+<p>The input data consists of the observed brightness temperatures of each sensor
+and three additional input variables. The ancillary information consists of
+the surface type, the total column water vapor and the two-meter temperature.
+In the GPROF algorithm the ancillary input data is used to preselect a retrieval
+database. This means that, depending of the values of these three variables, a
+different retrieval database with different a priori statistics is used.</p>
+<p>Training and test data is available in the <code class="code docutils literal notranslate"><span class="pre">regn</span></code> project directory
+in the <code class="code docutils literal notranslate"><span class="pre">data</span></code> subfolder. The data is stored as NetCDF4 file and
+contains the following variables:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 36%" />
+<col style="width: 51%" />
+<col style="width: 13%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Type</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">year</span></code></p></td>
+<td><p>the year</p></td>
+<td><p><code class="code docutils literal notranslate"><span class="pre">i4</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">month</span></code></p></td>
+<td><p>the month</p></td>
+<td><p><code class="code docutils literal notranslate"><span class="pre">i4</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">day</span></code></p></td>
+<td><p>the day</p></td>
+<td><p><code class="code docutils literal notranslate"><span class="pre">i4</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">hour</span></code></p></td>
+<td><p>the hour</p></td>
+<td><p><code class="code docutils literal notranslate"><span class="pre">i4</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">minute</span></code></p></td>
+<td><p>minute</p></td>
+<td><p><code class="code docutils literal notranslate"><span class="pre">i4</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">second</span></code></p></td>
+<td><p>second</p></td>
+<td><p><code class="code docutils literal notranslate"><span class="pre">i4</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">latitude</span></code></p></td>
+<td><p>Latitude of the pixel</p></td>
+<td><p><code class="code docutils literal notranslate"><span class="pre">f4</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">longitude</span></code></p></td>
+<td><p>Longitude of the pixel</p></td>
+<td><p><code class="code docutils literal notranslate"><span class="pre">f4</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">brightness_temperature</span></code></p></td>
+<td><p>The brightness temperatures for each channel</p></td>
+<td><p><code class="code docutils literal notranslate"><span class="pre">f4</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">surface_type</span></code></p></td>
+<td><p>Surface type as class</p></td>
+<td><p><code class="code docutils literal notranslate"><span class="pre">i4</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">tcwv</span></code></p></td>
+<td><p>Total column water vapor class</p></td>
+<td><p><code class="code docutils literal notranslate"><span class="pre">i4</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="code docutils literal notranslate"><span class="pre">t2m</span></code></p></td>
+<td><p>Two-meter temperature class</p></td>
+<td><p><code class="code docutils literal notranslate"><span class="pre">i4</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="code docutils literal notranslate"><span class="pre">surface_precipitation</span></code></p></td>
+<td><p>Surface precipitation</p></td>
+<td><p><code class="code docutils literal notranslate"><span class="pre">f4</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>Note that <code class="code docutils literal notranslate"><span class="pre">tcwv</span></code>, <code class="code docutils literal notranslate"><span class="pre">t2m</span></code> and <code class="code docutils literal notranslate"><span class="pre">surface_type</span></code> are given not as continuous
+variables but instead as discrete classes.</p>
+<p><code class="code docutils literal notranslate"><span class="pre">surface_precipitation</span></code> is our retrieval target.</p>
+</div>
+<div class="section" id="surface-types">
+<h2>Surface types<a class="headerlink" href="#surface-types" title="Permalink to this headline">¶</a></h2>
+<p>Surface types are encoded as follows:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 84%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Code</p></th>
+<th class="head"><p>Class</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>Ocean</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>Sea-Ice</p></td>
+</tr>
+<tr class="row-even"><td><p>3-7</p></td>
+<td><p>Decreasing vegetation</p></td>
+</tr>
+<tr class="row-odd"><td><p>8-11</p></td>
+<td><p>Decreasing snow cover</p></td>
+</tr>
+<tr class="row-even"><td><p>12</p></td>
+<td><p>Standing Water</p></td>
+</tr>
+<tr class="row-odd"><td><p>13</p></td>
+<td><p>Land/ocean or water Coast</p></td>
+</tr>
+<tr class="row-even"><td><p>14</p></td>
+<td><p>Sea-ice edge</p></td>
+</tr>
+<tr class="row-odd"><td><p>-99</p></td>
+<td><p>Missing value</p></td>
+</tr>
+</tbody>
+</table>
+</div>
 </div>
 
 
