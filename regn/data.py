@@ -68,8 +68,10 @@ def write_to_file(file, data, samples = -1):
     inds = np.random.permutation(np.arange(data.shape[0]))
     j = 0
     for _ in range(samples):
-        while not check_sample(data[inds[j]]):
+        while j < samples.shape[0] and not check_sample(data[inds[j]]):
             j = j+1
+        if j >= samples.shape[0]:
+            break
         d = data[inds[j]]
 
         v_year[i] = d[2]
