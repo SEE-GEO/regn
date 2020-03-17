@@ -15,7 +15,7 @@ install the development version.
 
 .. code-block:: none
 
-   git clone https://github.com/atmtools/typhon
+   git clone https://github.com/simonpf/typhon -b qrnn_refactoring
    cd typhon
    pip install -e .
 
@@ -26,6 +26,12 @@ Pytorch
 We will use the :code:`pytorch` deep-learning package as backend
 for neural networks. To install it, simply follow the instructions
 at `pytorch.org <https://pytorch.org/>`_.
+
+Jupyter
+^^^^^^^
+
+We will use jupyter notebooks for data analysis. To install :code:`jupyter`
+follow the instruction at the `jupyter homepage <https://jupyter.org/install>`_.
 
 regn
 ^^^^

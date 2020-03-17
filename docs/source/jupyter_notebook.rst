@@ -14,10 +14,11 @@ We will make use of the following tools:
 
 1. :code:`ssh`: I assume that you have an ssh-client on your laptop that
    allows you to log into your remote machine.
-2. :code:`tmux`: `tmux <https://github.com/tmux/tmux/wiki>`_ allows
-   running a server in a detached process so that it is not shut down
-   when we log out of our ssh session.
-3. :code:`jupyter`: Quite obviously, we will make use of `jupyter notebooks <https://jupyter.org/>`_.
+2. :code:`tmux`: `tmux <https://github.com/tmux/tmux/wiki>`_ should be
+   installed on the **remote machine** so that we can run a server in a
+   that it is not shut down when we log out of our ssh session.
+3. :code:`jupyter`: Quite obviously, we will make use of `jupyter notebooks <https://jupyter.org/>`_
+   so it needs to be installed on your **remote machine**.
 
 Make sure to install these tools if you haven't done so already.
 
@@ -67,7 +68,7 @@ session.
 
 Now start the jupyter notebook server. To be able to connect to the server from your
 **remote machine**, we have to tell the server to listen to your public IP. This
-is what :code:`--ip=\`hostname -i\`` does. To enable connecting via https, we also
+is what :code:`--ip= `hostname -i`` does. To enable connecting via https, we also
 need to provide paths to the certificate and key files we have created.
 
 .. code-block:: none
@@ -80,6 +81,10 @@ The server should now start up and print the IP and port it is listening to.
 
   [I 16:04:00.182 NotebookApp] The Jupyter Notebook is running at:
   [I 16:04:00.182 NotebookApp] https://<your_computer_name>.rss.chalmers.se:8888/
+
+The server will be running in the directory that you started it in. That means
+if you want to access the notebooks from this repository, you should issue the
+above command from the base directory.
 
 By default the server will listen to port 8888 but if you have other notebooks
 running it will use the next higher one until it finds a free port.
@@ -100,9 +105,15 @@ Accessing the server
 --------------------
 
 You can now connect to your jupyter server from the browser running on your
-**local computer** by navigating to :code:`<your_computer_name>.rss.chalmers.se:8888`
-in your browser. Your browser will likely print a security warning because we
-had to setup the SSL certificate ourselves, but you can safely ignore it.
+**local computer** by navigating to
+:code:`https://<your_computer_name>.rss.chalmers.se:8888` in your browser. Your
+browser will likely print a security warning because we had to setup the SSL
+certificate ourselves, but you can safely ignore it.
+
+.. note::
+
+    Note the :code:`https://` prefix to the address. This is important since the jupyter
+    server will not access insecure http requests.
 
 Single command for server start-up
 ----------------------------------
@@ -114,7 +125,8 @@ into an alias. To do this add the following to your :code:`~/.bashrc` file:
 
   alias start_jupyter_server="tmux new-session -d -s jupyter_notebook 'jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`hostname -i`'"
 
-You can then start a jupyter notebook server by simply issuing :code:`start_jupyter_server` on the command line.
+You can then start a jupyter notebook server by simply issuing :code:`start_jupyter_server` in
+the directory that you want to start the server in.
 
 Alternative: SSH port forwarding
 --------------------------------
@@ -122,9 +134,10 @@ Alternative: SSH port forwarding
 As an alternative to starting a server listening on the public IP address of
 your computer, you can forward a local port from your **remote machine** via
 ssh. For example, if you start a server on your remote machine without the
-:code:`--ip` argument, it will listen on :code:`localhost:8888`. You can access
-the server by forwarding port :code:`8888` from your **remote machine** to your
-local one using an ssh tunnel. The general syntax for ssh port forwarding is:
+:code:`--ip` argument, it will listen on `localhost:8888
+<http://localhost:8888>`_. You can access the server by forwarding port
+:code:`8888` from your **remote machine** to your local one using an ssh tunnel.
+The general syntax for ssh port forwarding is:
 
 .. code-block::
 
@@ -137,10 +150,9 @@ For example to forward local port :code:`8888` from your **remote  machine** to 
 
   ssh -L 8888:localhost:8888 <remote_ip>
 
-You can then access the server from your laptop by navigating to
-`localhost:8888 localhost:8888` in your browser. You will have to
-keep the ssh connection open as long as you want to access the server.
-Note also that when your notebook server is listening on another port
-than :code:`8888` your will have to adapt the :code:`<remote_port>` argument
-accordingly.
+You can then access the server from your laptop by navigating to `localhost:8888
+<http://localhost:8888>`_ in your browser. You will have to keep the ssh
+connection open as long as you want to access the server. Note also that when
+your notebook server is listening on another port than :code:`8888` your will
+have to adapt the :code:`<remote_port>` argument accordingly.
 

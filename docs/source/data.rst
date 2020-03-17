@@ -26,8 +26,10 @@ and the file format specification for all `GPM products
 <ftp://gpmweb2.pps.eosdis.nasa.gov/pub/GPMfilespec/filespec.GPM.pdf>`_ can be
 helpful.
 
-Input data
-^^^^^^^^^^
+Training data
+^^^^^^^^^^^^^
+
+
 
 The input data consists of the observed brightness temperatures of each sensor
 and three additional input variables. The ancillary information consists of
@@ -36,8 +38,8 @@ In the GPROF algorithm the ancillary input data is used to preselect a retrieval
 database. This means that, depending of the values of these three variables, a
 different retrieval database with different a priori statistics is used.
 
-Training and test data is available in the :code:`regn` project directory
-in the :code:`data` subfolder. The data is stored as NetCDF4 file and
+Training and test data is available in the :code:`regn` project directory on
+Dendrite in the :code:`data` subfolder. The data is stored as NetCDF4 file and
 contains the following variables:
 
 +--------------------------------+----------------------------------------------+------------+

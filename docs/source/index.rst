@@ -13,6 +13,7 @@ satellite observations of the Global Precipitation Measurement (`GPM
    :caption: Getting started
 
    dependencies
+   dendrite
    jupyter_notebook
 
 .. toctree::

@@ -21,10 +21,10 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-        <script type="text/javascript" src="_static/language_data.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
@@ -178,10 +178,11 @@ laptop at home).</p>
 <ol class="arabic simple">
 <li><p><code class="code docutils literal notranslate"><span class="pre">ssh</span></code>: I assume that you have an ssh-client on your laptop that
 allows you to log into your remote machine.</p></li>
-<li><p><code class="code docutils literal notranslate"><span class="pre">tmux</span></code>: <a class="reference external" href="https://github.com/tmux/tmux/wiki">tmux</a> allows
-running a server in a detached process so that it is not shut down
-when we log out of our ssh session.</p></li>
-<li><p><code class="code docutils literal notranslate"><span class="pre">jupyter</span></code>: Quite obviously, we will make use of <a class="reference external" href="https://jupyter.org/">jupyter notebooks</a>.</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">tmux</span></code>: <a class="reference external" href="https://github.com/tmux/tmux/wiki">tmux</a> should be
+installed on the <strong>remote machine</strong> so that we can run a server in a
+that it is not shut down when we log out of our ssh session.</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">jupyter</span></code>: Quite obviously, we will make use of <a class="reference external" href="https://jupyter.org/">jupyter notebooks</a>
+so it needs to be installed on your <strong>remote machine</strong>.</p></li>
 </ol>
 <p>Make sure to install these tools if you haven’t done so already.</p>
 </div>
@@ -220,7 +221,7 @@ session.</p>
 </div>
 <p>Now start the jupyter notebook server. To be able to connect to the server from your
 <strong>remote machine</strong>, we have to tell the server to listen to your public IP. This
-is what <code class="code docutils literal notranslate"><span class="pre">--ip=\`hostname</span> <span class="pre">-i\`</span></code> does. To enable connecting via https, we also
+is what <code class="code docutils literal notranslate"><span class="pre">--ip=</span> <span class="pre">`hostname</span> <span class="pre">-i`</span></code> does. To enable connecting via https, we also
 need to provide paths to the certificate and key files we have created.</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`hostname -i`
 </pre></div>
@@ -230,6 +231,9 @@ need to provide paths to the certificate and key files we have created.</p>
 [I 16:04:00.182 NotebookApp] https://&lt;your_computer_name&gt;.rss.chalmers.se:8888/
 </pre></div>
 </div>
+<p>The server will be running in the directory that you started it in. That means
+if you want to access the notebooks from this repository, you should issue the
+above command from the base directory.</p>
 <p>By default the server will listen to port 8888 but if you have other notebooks
 running it will use the next higher one until it finds a free port.
 <code class="code docutils literal notranslate"><span class="pre">&lt;your_computer_name&gt;</span></code> is the name of your computer that you use to log on
@@ -247,9 +251,15 @@ from the command line.</p>
 <div class="section" id="accessing-the-server">
 <h2>Accessing the server<a class="headerlink" href="#accessing-the-server" title="Permalink to this headline">¶</a></h2>
 <p>You can now connect to your jupyter server from the browser running on your
-<strong>local computer</strong> by navigating to <code class="code docutils literal notranslate"><span class="pre">&lt;your_computer_name&gt;.rss.chalmers.se:8888</span></code>
-in your browser. Your browser will likely print a security warning because we
-had to setup the SSL certificate ourselves, but you can safely ignore it.</p>
+<strong>local computer</strong> by navigating to
+<code class="code docutils literal notranslate"><span class="pre">https://&lt;your_computer_name&gt;.rss.chalmers.se:8888</span></code> in your browser. Your
+browser will likely print a security warning because we had to setup the SSL
+certificate ourselves, but you can safely ignore it.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Note the <code class="code docutils literal notranslate"><span class="pre">https://</span></code> prefix to the address. This is important since the jupyter
+server will not access insecure http requests.</p>
+</div>
 </div>
 <div class="section" id="single-command-for-server-start-up">
 <h2>Single command for server start-up<a class="headerlink" href="#single-command-for-server-start-up" title="Permalink to this headline">¶</a></h2>
@@ -258,16 +268,17 @@ into an alias. To do this add the following to your <code class="code docutils l
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>alias start_jupyter_server=&quot;tmux new-session -d -s jupyter_notebook &#39;jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`hostname -i`&#39;&quot;
 </pre></div>
 </div>
-<p>You can then start a jupyter notebook server by simply issuing <code class="code docutils literal notranslate"><span class="pre">start_jupyter_server</span></code> on the command line.</p>
+<p>You can then start a jupyter notebook server by simply issuing <code class="code docutils literal notranslate"><span class="pre">start_jupyter_server</span></code> in
+the directory that you want to start the server in.</p>
 </div>
 <div class="section" id="alternative-ssh-port-forwarding">
 <h2>Alternative: SSH port forwarding<a class="headerlink" href="#alternative-ssh-port-forwarding" title="Permalink to this headline">¶</a></h2>
 <p>As an alternative to starting a server listening on the public IP address of
 your computer, you can forward a local port from your <strong>remote machine</strong> via
 ssh. For example, if you start a server on your remote machine without the
-<code class="code docutils literal notranslate"><span class="pre">--ip</span></code> argument, it will listen on <code class="code docutils literal notranslate"><span class="pre">localhost:8888</span></code>. You can access
-the server by forwarding port <code class="code docutils literal notranslate"><span class="pre">8888</span></code> from your <strong>remote machine</strong> to your
-local one using an ssh tunnel. The general syntax for ssh port forwarding is:</p>
+<code class="code docutils literal notranslate"><span class="pre">--ip</span></code> argument, it will listen on <a class="reference external" href="http://localhost:8888">localhost:8888</a>. You can access the server by forwarding port
+<code class="code docutils literal notranslate"><span class="pre">8888</span></code> from your <strong>remote machine</strong> to your local one using an ssh tunnel.
+The general syntax for ssh port forwarding is:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ssh</span> <span class="o">-</span><span class="n">L</span> <span class="o">&lt;</span><span class="n">local_port</span><span class="o">&gt;</span><span class="p">:</span><span class="n">localhost</span><span class="p">:</span><span class="o">&lt;</span><span class="n">remote_port</span><span class="o">&gt;</span> <span class="o">&lt;</span><span class="n">your_computer_name</span><span class="o">&gt;.</span><span class="n">rss</span><span class="o">.</span><span class="n">chalmers</span><span class="o">.</span><span class="n">se</span>
 </pre></div>
 </div>
@@ -276,12 +287,10 @@ local one using an ssh tunnel. The general syntax for ssh port forwarding is:</p
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">ssh</span> <span class="o">-</span><span class="n">L</span> <span class="mi">8888</span><span class="p">:</span><span class="n">localhost</span><span class="p">:</span><span class="mi">8888</span> <span class="o">&lt;</span><span class="n">remote_ip</span><span class="o">&gt;</span>
 </pre></div>
 </div>
-<p>You can then access the server from your laptop by navigating to
-<cite>localhost:8888 localhost:8888</cite> in your browser. You will have to
-keep the ssh connection open as long as you want to access the server.
-Note also that when your notebook server is listening on another port
-than <code class="code docutils literal notranslate"><span class="pre">8888</span></code> your will have to adapt the <code class="code docutils literal notranslate"><span class="pre">&lt;remote_port&gt;</span></code> argument
-accordingly.</p>
+<p>You can then access the server from your laptop by navigating to <a class="reference external" href="http://localhost:8888">localhost:8888</a> in your browser. You will have to keep the ssh
+connection open as long as you want to access the server. Note also that when
+your notebook server is listening on another port than <code class="code docutils literal notranslate"><span class="pre">8888</span></code> your will
+have to adapt the <code class="code docutils literal notranslate"><span class="pre">&lt;remote_port&gt;</span></code> argument accordingly.</p>
 </div>
 </div>
 
