@@ -27,7 +27,7 @@ Setting up jupyter
 
 First, we need to perform some configurations on your **remote machine** to enable
 a secure connection to the notebook server. To do so, execute the following steps
-on the **remote machine**:
+on the **remote machine**.
 
 Setup a password
 ^^^^^^^^^^^^^^^^
@@ -68,12 +68,12 @@ session.
 
 Now start the jupyter notebook server. To be able to connect to the server from your
 **remote machine**, we have to tell the server to listen to your public IP. This
-is what :code:`--ip= `hostname -i`` does. To enable connecting via https, we also
+is what :code:`--ip= `curl ifconfig.co`` does. To enable connecting via https, we also
 need to provide paths to the certificate and key files we have created.
 
 .. code-block:: none
 
-   jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`hostname -i`
+   jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`curl ifconfig.co`
 
 The server should now start up and print the IP and port it is listening to.
 
@@ -90,7 +90,7 @@ By default the server will listen to port 8888 but if you have other notebooks
 running it will use the next higher one until it finds a free port.
 :code:`<your_computer_name>` is the name of your computer that you use to log on
 also via ssh. Alternatively you can use the public IP address of your computer.
-You can find out the public IP of your computer by running :code:`hostname -i`
+You can find out the public IP of your computer by running :code:`curl ifconfig.co`
 from the command line.
 
 You can now detach from the tmux window using the key combination
@@ -123,7 +123,7 @@ into an alias. To do this add the following to your :code:`~/.bashrc` file:
 
 .. code-block:: none
 
-  alias start_jupyter_server="tmux new-session -d -s jupyter_notebook 'jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`hostname -i`'"
+  alias start_jupyter_server="tmux new-session -d -s jupyter_notebook 'jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`curl ifconfig.co`'"
 
 You can then start a jupyter notebook server by simply issuing :code:`start_jupyter_server` in
 the directory that you want to start the server in.
@@ -155,4 +155,3 @@ You can then access the server from your laptop by navigating to `localhost:8888
 connection open as long as you want to access the server. Note also that when
 your notebook server is listening on another port than :code:`8888` your will
 have to adapt the :code:`<remote_port>` argument accordingly.
-

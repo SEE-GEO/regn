@@ -191,7 +191,7 @@ so it needs to be installed on your <strong>remote machine</strong>.</p></li>
 <h2>Setting up jupyter<a class="headerlink" href="#setting-up-jupyter" title="Permalink to this headline">¶</a></h2>
 <p>First, we need to perform some configurations on your <strong>remote machine</strong> to enable
 a secure connection to the notebook server. To do so, execute the following steps
-on the <strong>remote machine</strong>:</p>
+on the <strong>remote machine</strong>.</p>
 <div class="section" id="setup-a-password">
 <h3>Setup a password<a class="headerlink" href="#setup-a-password" title="Permalink to this headline">¶</a></h3>
 <p>Setup a password to access your jupyter notebook server by running the following
@@ -222,9 +222,9 @@ session.</p>
 </div>
 <p>Now start the jupyter notebook server. To be able to connect to the server from your
 <strong>remote machine</strong>, we have to tell the server to listen to your public IP. This
-is what <code class="code docutils literal notranslate"><span class="pre">--ip=</span> <span class="pre">`hostname</span> <span class="pre">-i`</span></code> does. To enable connecting via https, we also
+is what <code class="code docutils literal notranslate"><span class="pre">--ip=</span> <span class="pre">`curl</span> <span class="pre">ifconfig.co`</span></code> does. To enable connecting via https, we also
 need to provide paths to the certificate and key files we have created.</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`hostname -i`
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`curl ifconfig.co`
 </pre></div>
 </div>
 <p>The server should now start up and print the IP and port it is listening to.</p>
@@ -239,7 +239,7 @@ above command from the base directory.</p>
 running it will use the next higher one until it finds a free port.
 <code class="code docutils literal notranslate"><span class="pre">&lt;your_computer_name&gt;</span></code> is the name of your computer that you use to log on
 also via ssh. Alternatively you can use the public IP address of your computer.
-You can find out the public IP of your computer by running <code class="code docutils literal notranslate"><span class="pre">hostname</span> <span class="pre">-i</span></code>
+You can find out the public IP of your computer by running <code class="code docutils literal notranslate"><span class="pre">curl</span> <span class="pre">ifconfig.co</span></code>
 from the command line.</p>
 <p>You can now detach from the tmux window using the key combination
 <code class="code docutils literal notranslate"><span class="pre">CTRL</span> <span class="pre">+</span> <span class="pre">b</span></code> followed by <code class="code docutils literal notranslate"><span class="pre">d</span></code>.</p>
@@ -266,7 +266,7 @@ server will not access insecure http requests.</p>
 <h2>Single command for server start-up<a class="headerlink" href="#single-command-for-server-start-up" title="Permalink to this headline">¶</a></h2>
 <p>To start up a server with a single command, you can combine the above commands
 into an alias. To do this add the following to your <code class="code docutils literal notranslate"><span class="pre">~/.bashrc</span></code> file:</p>
-<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>alias start_jupyter_server=&quot;tmux new-session -d -s jupyter_notebook &#39;jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`hostname -i`&#39;&quot;
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>alias start_jupyter_server=&quot;tmux new-session -d -s jupyter_notebook &#39;jupyter notebook --certfile=~/.jupyter/mycert.pem --keyfile ~/.jupyter/mykey.key --ip=`curl ifconfig.co`&#39;&quot;
 </pre></div>
 </div>
 <p>You can then start a jupyter notebook server by simply issuing <code class="code docutils literal notranslate"><span class="pre">start_jupyter_server</span></code> in
