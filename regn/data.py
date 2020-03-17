@@ -2,6 +2,116 @@ import numpy as np
 import glob
 import os
 import netCDF4
+import torch
+from torch.utils.data import Dataset
+
+################################################################################
+# Torch dataloader interface
+################################################################################
+
+class GprofData(Dataset):
+    """
+    Pytorch dataset for the Gprof training data.
+
+    This class is a wrapper around the netCDF4 files that are used to store
+    the GProf training data. It provides as input vector the brightness
+    temperatures and as output vector the surface precipitation.
+
+    """
+    def __init__(self,
+                 path,
+                 batch_size = None,
+                 surface_type = -1):
+        """
+        Create instance of the dataset from a given file path.
+
+        Args:
+            path: Path to the NetCDF4 containing the data.
+            batch_size: If positive, data is provided in batches of this size
+            surface_type: If positive, only samples of the given surface type
+                are provided. Otherwise the surface type index is provided as
+                input features.
+        """
+        super().__init__()
+        self.batch_size = batch_size
+
+        self.file = netCDF4.Dataset(path, mode = "r")
+
+        tcwv = self.file.variables["tcwv"][:]
+        surface_type_data = self.file.variables["surface_type"][:]
+        t2m = self.file.variables["t2m"][:]
+        bt = self.file.variables["brightness_temperature"][:]
+        bt_min = self.file.variables["bt_min"][:].reshape(1, -1)
+        bt_max = self.file.variables["bt_max"][:].reshape(1, -1)
+
+        valid = surface_type_data > 0
+        valid *= t2m > 0
+        valid *= tcwv > 0
+        if surface_type > 0:
+            valid *= surface_type_data == surface_type
+
+        inds = np.random.permutation(np.where(valid)[0])
+
+        tcwv = tcwv[inds].reshape(-1, 1)
+        tcwv_min = tcwv.min()
+        tcwv_max = tcwv.max()
+        tcwv = (tcwv - tcwv.min()) / (tcwv.max() - tcwv.min())
+
+        t2m = t2m[inds].reshape(-1, 1)
+        t2m_min = t2m.min()
+        t2m_max = t2m.max()
+        t2m = (t2m - t2m.min()) / (t2m.max() - t2m.min())
+
+        surface_type_data = surface_type_data[inds].reshape(-1, 1)
+        surface_type_min = surface_type_data.min()
+        surface_type_max = surface_type_data.max()
+        surface_type_data = ((surface_type_data - surface_type_min)
+                             / (surface_type_max - surface_type_min))
+
+        bt = bt[inds]
+        bt = (bt - bt_min) / (bt_max - bt_min)
+
+        if surface_type < 0:
+            self.x = np.concatenate([bt, t2m, tcwv, surface_type_data], axis=1)
+        else:
+            self.x = np.concatenate([bt, t2m, tcwv], axis=1)
+        self.x = self.x.data
+        self.y = self.file.variables["surface_precipitation"][inds]
+        self.y = self.y.data
+
+    def __len__(self):
+        """
+        The number of entries in the training data. This is part of the
+        pytorch interface for datasets.
+
+        Return:
+            int: The number of samples in the data set
+        """
+        if self.batch_size is None:
+            return self.x.shape[0]
+        else:
+            return self.x.shape[0] // self.batch_size
+
+    def __getitem__(self, i):
+        """
+        Return element from the dataset. This is part of the
+        pytorch interface for datasets.
+
+        Args:
+            i(int): The index of the sample to return
+        """
+        if self.batch_size is None:
+            return (torch.tensor(self.x[[i], :]),
+                    torch.tensor(self.y[[i]]))
+        else:
+            i_start = self.batch_size * i
+            i_end = self.batch_size * (i + 1)
+            return (torch.tensor(self.x[i_start : i_end, :]),
+                    torch.tensor(self.y[i_start : i_end]))
+
+################################################################################
+# Interface to binary data.
+################################################################################
 
 types =  [('nx', 'i4'), ('ny', 'i4')]
 types += [('year', 'i4'), ('month', 'i4'), ('day', 'i4'), ('hour', 'i4'), ('minute', 'i4'), ('second', 'i4')]

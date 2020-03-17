@@ -21,3 +21,9 @@ satellite observations of the Global Precipitation Measurement (`GPM
 
    overview
    data
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API
+
+   regn.data

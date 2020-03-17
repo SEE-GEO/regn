@@ -14,6 +14,9 @@ setup(
     url='https://github.com/simonpf/regn',  # Optional
     author='Simon Pfreundschuh, Inderpreet Kaur, Patrick Eriksson',  # Optional
     author_email='simon.pfreundschuh@chalmers.se',  # Optional
+    install_requires=[
+        "tqdm",
+    ],
     packages=["regn"],
     python_requires='>=3.6',
     project_urls={  # Optional
