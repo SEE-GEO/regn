@@ -21,10 +21,10 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-        <script type="text/javascript" src="_static/language_data.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
@@ -82,6 +82,7 @@
               <p class="caption"><span class="caption-text">Getting started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="dependencies.html">Required software</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dendrite.html">Dendrite</a></li>
 <li class="toctree-l1"><a class="reference internal" href="jupyter_notebook.html">Remote access to jupyter notebooks</a></li>
 </ul>
 <p class="caption"><span class="caption-text">REGN</span></p>
@@ -89,7 +90,7 @@
 <li class="toctree-l1"><a class="reference internal" href="overview.html">Aim</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Data</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#documentation">Documentation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#input-data">Input data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#training-data">Training data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#surface-types">Surface types</a></li>
 </ul>
 </li>
@@ -178,16 +179,16 @@ algorithm theoretical basis document (ATBD) for the <a class="reference external
 and the file format specification for all <a class="reference external" href="ftp://gpmweb2.pps.eosdis.nasa.gov/pub/GPMfilespec/filespec.GPM.pdf">GPM products</a> can be
 helpful.</p>
 </div>
-<div class="section" id="input-data">
-<h2>Input data<a class="headerlink" href="#input-data" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="training-data">
+<h2>Training data<a class="headerlink" href="#training-data" title="Permalink to this headline">¶</a></h2>
 <p>The input data consists of the observed brightness temperatures of each sensor
 and three additional input variables. The ancillary information consists of
 the surface type, the total column water vapor and the two-meter temperature.
 In the GPROF algorithm the ancillary input data is used to preselect a retrieval
 database. This means that, depending of the values of these three variables, a
 different retrieval database with different a priori statistics is used.</p>
-<p>Training and test data is available in the <code class="code docutils literal notranslate"><span class="pre">regn</span></code> project directory
-in the <code class="code docutils literal notranslate"><span class="pre">data</span></code> subfolder. The data is stored as NetCDF4 file and
+<p>Training and test data is available in the <code class="code docutils literal notranslate"><span class="pre">regn</span></code> project directory on
+Dendrite in the <code class="code docutils literal notranslate"><span class="pre">data</span></code> subfolder. The data is stored as NetCDF4 file and
 contains the following variables:</p>
 <table class="docutils align-default">
 <colgroup>

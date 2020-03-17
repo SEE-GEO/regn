@@ -15,8 +15,8 @@ We will make use of the following tools:
 1. :code:`ssh`: I assume that you have an ssh-client on your laptop that
    allows you to log into your remote machine.
 2. :code:`tmux`: `tmux <https://github.com/tmux/tmux/wiki>`_ should be
-   installed on the **remote machine** so that we can run a server in a
-   that it is not shut down when we log out of our ssh session.
+   installed on the **remote machine** so that we can run a server
+   that is not shut down when we log out of our ssh session.
 3. :code:`jupyter`: Quite obviously, we will make use of `jupyter notebooks <https://jupyter.org/>`_
    so it needs to be installed on your **remote machine**.
 
