@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>data &mdash; REGN 0.1 documentation</title>
+  <title>Datasets and -interfaces &mdash; REGN 0.1 documentation</title>
   
 
   
@@ -21,10 +21,10 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-        <script type="text/javascript" src="_static/language_data.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
@@ -82,16 +82,25 @@
               <p class="caption"><span class="caption-text">Getting started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="dependencies.html">Required software</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dendrite.html">Dendrite</a></li>
 <li class="toctree-l1"><a class="reference internal" href="jupyter_notebook.html">Remote access to jupyter notebooks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
 </ul>
 <p class="caption"><span class="caption-text">REGN</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="overview.html">Aim</a></li>
 <li class="toctree-l1"><a class="reference internal" href="data.html">Data</a></li>
 </ul>
-<p class="caption"><span class="caption-text">API</span></p>
+<p class="caption"><span class="caption-text">API Documentation</span></p>
 <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">data</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Datasets and -interfaces</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#gprof-data">GPROF data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#module-regn.data">Pytorch datasets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-regn.data">Reading binary data</a></li>
+</ul>
+</li>
+</ul>
+</li>
 </ul>
 
             
@@ -137,7 +146,7 @@
     
       <li><a href="index.html">Docs</a> &raquo;</li>
         
-      <li>data</li>
+      <li>Datasets and -interfaces</li>
     
     
       <li class="wy-breadcrumbs-aside">
@@ -156,8 +165,53 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="data">
-<h1>data<a class="headerlink" href="#data" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="datasets-and-interfaces">
+<h1>Datasets and -interfaces<a class="headerlink" href="#datasets-and-interfaces" title="Permalink to this headline">¶</a></h1>
+<p>The <code class="code docutils literal notranslate"><span class="pre">regn.data</span></code> module contains interfaces to the datasets that we
+are working with in the project.</p>
+<div class="section" id="gprof-data">
+<h2>GPROF data<a class="headerlink" href="#gprof-data" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="module-regn.data">
+<span id="pytorch-datasets"></span><h3>Pytorch datasets<a class="headerlink" href="#module-regn.data" title="Permalink to this headline">¶</a></h3>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">GprofData</span></code>(path[, batch_size, surface_type])</p></td>
+<td><p>Pytorch dataset for the Gprof training data.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="section" id="module-regn.data">
+<span id="reading-binary-data"></span><h3>Reading binary data<a class="headerlink" href="#module-regn.data" title="Permalink to this headline">¶</a></h3>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">read_file</span></code>(f)</p></td>
+<td><p>Read GPM binary file.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_sample</span></code>(data)</p></td>
+<td><p>Check that brightness temperatures are within a valid range.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">write_to_file</span></code>(file, data[, samples])</p></td>
+<td><p>Write data to NetCDF file.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_output_file</span></code>(path)</p></td>
+<td><p>Creates netCDF4 output file to store training data in.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">extract_data</span></code>(base_path, y, m, d, samples, file)</p></td>
+<td><p>Extract training data from binary files for given year, month and day.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </div>
 
 

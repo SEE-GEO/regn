@@ -9,7 +9,7 @@ satellite observations of the Global Precipitation Measurement (`GPM
 <https://www.nasa.gov/mission_pages/GPM/main/index.html>`_).
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: Getting started
 
    dependencies
@@ -18,14 +18,14 @@ satellite observations of the Global Precipitation Measurement (`GPM
    documentation
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
    :caption: REGN
 
    overview
    data
 
 .. toctree::
-   :maxdepth: 2
-   :caption: API
+   :maxdepth: 1
+   :caption: API Documentation
 
-   regn.data
+   api.data

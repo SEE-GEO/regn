@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>REGN &mdash; REGN 0.1 documentation</title>
+  <title>Datasets and -interfaces &mdash; REGN 0.1 documentation</title>
   
 
   
@@ -35,7 +35,7 @@
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Required software" href="dependencies.html" /> 
+    <link rel="prev" title="Data" href="data.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -49,7 +49,7 @@
           
 
           
-            <a href="#" class="icon icon-home"> REGN
+            <a href="index.html" class="icon icon-home"> REGN
           
 
           
@@ -116,9 +116,9 @@
 </li>
 </ul>
 <p class="caption"><span class="caption-text">API Documentation</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="api.data.html">Datasets and -interfaces</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="api.data.html#gprof-data">GPROF data</a></li>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Datasets and -interfaces</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#gprof-data">GPROF data</a></li>
 </ul>
 </li>
 </ul>
@@ -135,7 +135,7 @@
       <nav class="wy-nav-top" aria-label="top navigation">
         
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="#">REGN</a>
+          <a href="index.html">REGN</a>
         
       </nav>
 
@@ -164,15 +164,15 @@
 
   <ul class="wy-breadcrumbs">
     
-      <li><a href="#">Docs</a> &raquo;</li>
+      <li><a href="index.html">Docs</a> &raquo;</li>
         
-      <li>REGN</li>
+      <li>Datasets and -interfaces</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+            <a href="_sources/api.data.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -185,33 +185,52 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="regn">
-<h1>REGN<a class="headerlink" href="#regn" title="Permalink to this headline">¶</a></h1>
-<p>Robust Estimation of Global Precipitation using Neural Networks (REGN) is a
-research project investigating how quantile regression neural networks (<a class="reference external" href="https://www.atmos-meas-tech.net/11/4627/2018/">QRNNs</a>) can be used to yield more
-reliable and potentially more accurate precipitation estimates from the
-satellite observations of the Global Precipitation Measurement (<a class="reference external" href="https://www.nasa.gov/mission_pages/GPM/main/index.html">GPM</a>).</p>
-<div class="toctree-wrapper compound">
-<p class="caption"><span class="caption-text">Getting started</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="dependencies.html">Required software</a></li>
-<li class="toctree-l1"><a class="reference internal" href="dendrite.html">Dendrite</a></li>
-<li class="toctree-l1"><a class="reference internal" href="jupyter_notebook.html">Remote access to jupyter notebooks</a></li>
-<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
-</ul>
+  <div class="section" id="datasets-and-interfaces">
+<h1>Datasets and -interfaces<a class="headerlink" href="#datasets-and-interfaces" title="Permalink to this headline">¶</a></h1>
+<p>The <code class="code docutils literal notranslate"><span class="pre">regn.data</span></code> module contains interfaces to the datasets that we
+are working with in the project.</p>
+<div class="section" id="gprof-data">
+<h2>GPROF data<a class="headerlink" href="#gprof-data" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="module-regn.data">
+<span id="pytorch-datasets"></span><h3>Pytorch datasets<a class="headerlink" href="#module-regn.data" title="Permalink to this headline">¶</a></h3>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="autodoc/regn.html#regn.data.GprofData" title="regn.data.GprofData"><code class="xref py py-obj docutils literal notranslate"><span class="pre">GprofData</span></code></a>(path[, batch_size, surface_type])</p></td>
+<td><p>Pytorch dataset for the Gprof training data.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
-<div class="toctree-wrapper compound">
-<p class="caption"><span class="caption-text">REGN</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="overview.html">Aim</a></li>
-<li class="toctree-l1"><a class="reference internal" href="data.html">Data</a></li>
-</ul>
+<div class="section" id="module-regn.data">
+<span id="reading-binary-data"></span><h3>Reading binary data<a class="headerlink" href="#module-regn.data" title="Permalink to this headline">¶</a></h3>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="autodoc/regn.html#regn.data.read_file" title="regn.data.read_file"><code class="xref py py-obj docutils literal notranslate"><span class="pre">read_file</span></code></a>(f)</p></td>
+<td><p>Read GPM binary file.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="autodoc/regn.html#regn.data.check_sample" title="regn.data.check_sample"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_sample</span></code></a>(data)</p></td>
+<td><p>Check that brightness temperatures are within a valid range.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="autodoc/regn.html#regn.data.write_to_file" title="regn.data.write_to_file"><code class="xref py py-obj docutils literal notranslate"><span class="pre">write_to_file</span></code></a>(file, data[, samples])</p></td>
+<td><p>Write data to NetCDF file.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="autodoc/regn.html#regn.data.create_output_file" title="regn.data.create_output_file"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_output_file</span></code></a>(path)</p></td>
+<td><p>Creates netCDF4 output file to store training data in.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="autodoc/regn.html#regn.data.extract_data" title="regn.data.extract_data"><code class="xref py py-obj docutils literal notranslate"><span class="pre">extract_data</span></code></a>(base_path, y, m, d, samples, file)</p></td>
+<td><p>Extract training data from binary files for given year, month and day.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
-<div class="toctree-wrapper compound">
-<p class="caption"><span class="caption-text">API Documentation</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="api.data.html">Datasets and -interfaces</a></li>
-</ul>
 </div>
 </div>
 
@@ -223,8 +242,8 @@ satellite observations of the Global Precipitation Measurement (<a class="refere
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="dependencies.html" class="btn btn-neutral float-right" title="Required software" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
+        <a href="data.html" class="btn btn-neutral float-left" title="Data" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

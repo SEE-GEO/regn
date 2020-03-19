@@ -138,13 +138,14 @@ def read_file(f):
 
 def check_sample(data):
     """
-    Check that brightness temperatures are within a valid range.
+    Check that brightness temperatures of a sample are within a valid range.
 
     Arguments:
         data: The data array containing the data of one training sample.
 
     Return:
-        Whether the given sample contains valid tbs.
+        Bool indicating whether the given sample contains valid brightness
+        temperatures.
     """
     return all([data[i] > 0 and data[i] < 1000 for i in range(13, 26)])
 
@@ -239,7 +240,12 @@ def create_output_file(path):
 
     return file
 
-def extract_data(base_path, y, m, d, samples, file):
+def extract_data(base_path,
+                 year,
+                 month,
+                 day,
+                 samples,
+                 file):
     """
     Extract training data from binary files for given year, month and day.
 
@@ -251,8 +257,8 @@ def extract_data(base_path, y, m, d, samples, file):
         file: File handle of the netCDF4 file into which to store the results.
     """
     path = os.path.join(base_path,
-                        "{:02d}{:02d}".format(y, m),
-                        "*20{:02d}{:02d}{:02d}*.dat".format(y, m, d))
+                        "{:02d}{:02d}".format(year, month),
+                        "*20{:02d}{:02d}{:02d}*.dat".format(year, month, day))
     files = glob.glob(path)
     if len(files) > 0:
         samples_per_file = samples // len(files)

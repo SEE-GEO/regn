@@ -1,0 +1,320 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>regn package &mdash; REGN 0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> REGN
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../dependencies.html">Required software</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../dependencies.html#typhon">Typhon</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dependencies.html#pytorch">Pytorch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dependencies.html#jupyter">Jupyter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dependencies.html#regn">regn</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../dendrite.html">Dendrite</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../jupyter_notebook.html">Remote access to jupyter notebooks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../jupyter_notebook.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../jupyter_notebook.html#setting-up-jupyter">Setting up jupyter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../jupyter_notebook.html#starting-jupyter">Starting jupyter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../jupyter_notebook.html#accessing-the-server">Accessing the server</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../jupyter_notebook.html#single-command-for-server-start-up">Single command for server start-up</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../jupyter_notebook.html#alternative-ssh-port-forwarding">Alternative: SSH port forwarding</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../documentation.html">Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../documentation.html#format">Format</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../documentation.html#restructuredtext">reStructuredText</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../documentation.html#building-the-documentation">Building the documentation</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption"><span class="caption-text">REGN</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../overview.html">Aim</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data.html">Data</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../data.html#documentation">Documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data.html#training-data">Training data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data.html#surface-types">Surface types</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption"><span class="caption-text">API Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api.data.html">Datasets and -interfaces</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../api.data.html#gprof-data">GPROF data</a></li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">REGN</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+      <li>regn package</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/autodoc/regn.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="regn-package">
+<h1>regn package<a class="headerlink" href="#regn-package" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Permalink to this headline">¶</a></h2>
+</div>
+<div class="section" id="module-regn.data">
+<span id="regn-data-module"></span><h2>regn.data module<a class="headerlink" href="#module-regn.data" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="regn.data.GprofData">
+<em class="property">class </em><code class="sig-prename descclassname">regn.data.</code><code class="sig-name descname">GprofData</code><span class="sig-paren">(</span><em class="sig-param">path</em>, <em class="sig-param">batch_size=None</em>, <em class="sig-param">surface_type=-1</em><span class="sig-paren">)</span><a class="headerlink" href="#regn.data.GprofData" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.utils.data.dataset.Dataset</span></code></p>
+<p>Pytorch dataset for the Gprof training data.</p>
+<p>This class is a wrapper around the netCDF4 files that are used to store
+the GProf training data. It provides as input vector the brightness
+temperatures and as output vector the surface precipitation.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="regn.data.check_sample">
+<code class="sig-prename descclassname">regn.data.</code><code class="sig-name descname">check_sample</code><span class="sig-paren">(</span><em class="sig-param">data</em><span class="sig-paren">)</span><a class="headerlink" href="#regn.data.check_sample" title="Permalink to this definition">¶</a></dt>
+<dd><p>Check that brightness temperatures are within a valid range.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>data</strong> – The data array containing the data of one training sample.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Whether the given sample contains valid tbs.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="regn.data.create_output_file">
+<code class="sig-prename descclassname">regn.data.</code><code class="sig-name descname">create_output_file</code><span class="sig-paren">(</span><em class="sig-param">path</em><span class="sig-paren">)</span><a class="headerlink" href="#regn.data.create_output_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates netCDF4 output file to store training data in.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>path</strong> – Filename of the file to create.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>netCDF4 Dataset object pointing to the created file</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="regn.data.extract_data">
+<code class="sig-prename descclassname">regn.data.</code><code class="sig-name descname">extract_data</code><span class="sig-paren">(</span><em class="sig-param">base_path</em>, <em class="sig-param">y</em>, <em class="sig-param">m</em>, <em class="sig-param">d</em>, <em class="sig-param">samples</em>, <em class="sig-param">file</em><span class="sig-paren">)</span><a class="headerlink" href="#regn.data.extract_data" title="Permalink to this definition">¶</a></dt>
+<dd><p>Extract training data from binary files for given year, month and day.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>base_path</strong> (<em>str</em>) – Base directory containing the training data.</p></li>
+<li><p><strong>year</strong> (<em>int</em>) – The year from which to extract the training data.</p></li>
+<li><p><strong>month</strong> (<em>int</em>) – The month from which to extract the training data.</p></li>
+<li><p><strong>day</strong> (<em>int</em>) – The day for which to extract training data.</p></li>
+<li><p><strong>file</strong> – File handle of the netCDF4 file into which to store the results.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="regn.data.read_file">
+<code class="sig-prename descclassname">regn.data.</code><code class="sig-name descname">read_file</code><span class="sig-paren">(</span><em class="sig-param">f</em><span class="sig-paren">)</span><a class="headerlink" href="#regn.data.read_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Read GPM binary file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>f</strong> (<em>str</em>) – Filename of file to read</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>numpy memmap object pointing to the data.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="regn.data.write_to_file">
+<code class="sig-prename descclassname">regn.data.</code><code class="sig-name descname">write_to_file</code><span class="sig-paren">(</span><em class="sig-param">file</em>, <em class="sig-param">data</em>, <em class="sig-param">samples=-1</em><span class="sig-paren">)</span><a class="headerlink" href="#regn.data.write_to_file" title="Permalink to this definition">¶</a></dt>
+<dd><p>Write data to NetCDF file.</p>
+<dl class="simple">
+<dt>Arguments</dt><dd><p>file: File handle to the output file.
+data: numpy memmap object pointing to the binary data</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+<div class="section" id="module-regn">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-regn" title="Permalink to this headline">¶</a></h2>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2020, Simon Pfreundschuh, Inderpreet Kaur, Patrick Eriksson
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(false);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>
