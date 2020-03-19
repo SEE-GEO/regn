@@ -1,0 +1,258 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Documentation &mdash; REGN 0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Aim" href="overview.html" />
+    <link rel="prev" title="Remote access to jupyter notebooks" href="jupyter_notebook.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> REGN
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Getting started</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="dependencies.html">Required software</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dendrite.html">Dendrite</a></li>
+<li class="toctree-l1"><a class="reference internal" href="jupyter_notebook.html">Remote access to jupyter notebooks</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#format">Format</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#restructuredtext">reStructuredText</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#building-the-documentation">Building the documentation</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption"><span class="caption-text">REGN</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Aim</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html">Data</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">REGN</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Documentation</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/documentation.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="documentation">
+<h1>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h1>
+<p>Just like science, code is much more useful when it’s properly documented.
+For this project, we use <a class="reference external" href="https://www.sphinx-doc.org/en/stable/">Sphinx</a>,
+which is arguably the most common framework to document Python projects.</p>
+<div class="section" id="format">
+<h2>Format<a class="headerlink" href="#format" title="Permalink to this headline">¶</a></h2>
+<p>The documentation consists of source files, which can be found in the
+<code class="code docutils literal notranslate"><span class="pre">docs/source</span></code> folder. It’s structured as a hierarchy of <code class="code docutils literal notranslate"><span class="pre">*.rst</span></code>.
+The <code class="code docutils literal notranslate"><span class="pre">index.rst</span></code> file is the root of the documentation, all other files
+that should be included must be linked from this file directly or indirectly.</p>
+<p>The documentation in the <code class="code docutils literal notranslate"><span class="pre">*.rst</span></code> files can be <em>built</em> to create a single
+PDF document or a tree of HTML files that can be hosted online.</p>
+</div>
+<div class="section" id="restructuredtext">
+<h2>reStructuredText<a class="headerlink" href="#restructuredtext" title="Permalink to this headline">¶</a></h2>
+<p>The documentation is written using <a class="reference external" href="https://www.sphinx-doc.org/en/stable/usage/restructuredtext/basics.html">reStructuredText</a>
+markup language. It provides a simple way to add structures to documents
+written in plain text. For example you can make a line a section heading
+by underlining it with <code class="code docutils literal notranslate"><span class="pre">=</span></code>:</p>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span><span class="gh">Section</span>
+<span class="gh">=======</span>
+</pre></div>
+</div>
+<p>To see how it is used it is probably easiest to just have a look a
+the <code class="code docutils literal notranslate"><span class="pre">*.rst</span></code> file in the <code class="code docutils literal notranslate"><span class="pre">docs</span></code> folder our consult the
+Sphinx reference on reStructuredText linked above.</p>
+</div>
+<div class="section" id="building-the-documentation">
+<h2>Building the documentation<a class="headerlink" href="#building-the-documentation" title="Permalink to this headline">¶</a></h2>
+<p>To build the HTML version of the documentation navigate to the <code class="code docutils literal notranslate"><span class="pre">docs</span></code>
+subfolder and run the following command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>sphinx-build source .
+</pre></div>
+</div>
+<p>This will create build the HTML file that make up the documentation hosted
+on <a class="reference external" href="https://simonpf.github.com/regn">simonpf.github.com/regn</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you add documentation to the project that results in a new HTML file in
+the <code class="code docutils literal notranslate"><span class="pre">docs</span></code> folder, you will need to add this to git and push to the
+central repository for it to become available on <a class="reference external" href="https://simonpf.github.com/regn">simonpf.github.com/regn</a>.</p>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="overview.html" class="btn btn-neutral float-right" title="Aim" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="jupyter_notebook.html" class="btn btn-neutral float-left" title="Remote access to jupyter notebooks" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2020, Simon Pfreundschuh, Inderpreet Kaur, Patrick Eriksson
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

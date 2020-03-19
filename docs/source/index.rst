@@ -15,6 +15,7 @@ satellite observations of the Global Precipitation Measurement (`GPM
    dependencies
    dendrite
    jupyter_notebook
+   documentation
 
 .. toctree::
    :maxdepth: 2
