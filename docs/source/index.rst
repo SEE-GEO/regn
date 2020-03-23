@@ -26,6 +26,12 @@ satellite observations of the Global Precipitation Measurement (`GPM
 
 .. toctree::
    :maxdepth: 1
+   :caption: Examples
+
+   notebooks/examples/train_qrnn
+
+.. toctree::
+   :maxdepth: 1
    :caption: API Documentation
 
    api.data

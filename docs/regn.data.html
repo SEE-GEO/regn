@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Datasets and -interfaces &mdash; REGN 0.1 documentation</title>
+  <title>data &mdash; REGN 0.1 documentation</title>
   
 
   
@@ -21,10 +21,11 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/language_data.js"></script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+        <script type="text/javascript" src="_static/language_data.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
@@ -34,8 +35,7 @@
   <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="Data" href="data.html" /> 
+    <link rel="search" title="Search" href="search.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -81,24 +81,44 @@
             
               <p class="caption"><span class="caption-text">Getting started</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="dependencies.html">Required software</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dependencies.html">Required software</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dependencies.html#typhon">Typhon</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dependencies.html#pytorch">Pytorch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dependencies.html#jupyter">Jupyter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dependencies.html#regn">regn</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="dendrite.html">Dendrite</a></li>
-<li class="toctree-l1"><a class="reference internal" href="jupyter_notebook.html">Remote access to jupyter notebooks</a></li>
-<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="jupyter_notebook.html">Remote access to jupyter notebooks</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="jupyter_notebook.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jupyter_notebook.html#setting-up-jupyter">Setting up jupyter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jupyter_notebook.html#starting-jupyter">Starting jupyter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jupyter_notebook.html#accessing-the-server">Accessing the server</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jupyter_notebook.html#single-command-for-server-start-up">Single command for server start-up</a></li>
+<li class="toctree-l2"><a class="reference internal" href="jupyter_notebook.html#alternative-ssh-port-forwarding">Alternative: SSH port forwarding</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">Documentation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="documentation.html#format">Format</a></li>
+<li class="toctree-l2"><a class="reference internal" href="documentation.html#restructuredtext">reStructuredText</a></li>
+<li class="toctree-l2"><a class="reference internal" href="documentation.html#building-the-documentation">Building the documentation</a></li>
+</ul>
+</li>
 </ul>
 <p class="caption"><span class="caption-text">REGN</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="overview.html">Aim</a></li>
-<li class="toctree-l1"><a class="reference internal" href="data.html">Data</a></li>
-</ul>
-<p class="caption"><span class="caption-text">API Documentation</span></p>
-<ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Datasets and -interfaces</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#gprof-data">GPROF data</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#module-regn.data">Pytorch datasets</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#module-regn.data">Reading binary data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html">Data</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="data.html#documentation">Documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#training-data">Training data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html#surface-types">Surface types</a></li>
 </ul>
 </li>
+</ul>
+<p class="caption"><span class="caption-text">API Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api.data.html">Datasets and -interfaces</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api.data.html#gprof-data">GPROF data</a></li>
 </ul>
 </li>
 </ul>
@@ -146,7 +166,7 @@
     
       <li><a href="index.html">Docs</a> &raquo;</li>
         
-      <li>Datasets and -interfaces</li>
+      <li>data</li>
     
     
       <li class="wy-breadcrumbs-aside">
@@ -165,53 +185,32 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="datasets-and-interfaces">
-<h1>Datasets and -interfaces<a class="headerlink" href="#datasets-and-interfaces" title="Permalink to this headline">¶</a></h1>
-<p>The <code class="code docutils literal notranslate"><span class="pre">regn.data</span></code> module contains interfaces to the datasets that we
-are working with in the project.</p>
-<div class="section" id="gprof-data">
-<h2>GPROF data<a class="headerlink" href="#gprof-data" title="Permalink to this headline">¶</a></h2>
+  
+<style>
+/* CSS overrides for sphinx_rtd_theme */
+
+/* 24px margin */
+.nbinput.nblast.container,
+.nboutput.nblast.container {
+    margin-bottom: 19px;  /* padding has already 5px */
+}
+
+/* ... except between code cells! */
+.nblast.container + .nbinput.container {
+    margin-top: -19px;
+}
+
+.admonition > p:before {
+    margin-right: 4px;  /* make room for the exclamation icon */
+}
+
+/* Fix math alignment, see https://github.com/rtfd/sphinx_rtd_theme/pull/686 */
+.math {
+    text-align: unset;
+}
+</style>
 <div class="section" id="module-regn.data">
-<span id="pytorch-datasets"></span><h3>Pytorch datasets<a class="headerlink" href="#module-regn.data" title="Permalink to this headline">¶</a></h3>
-<table class="longtable docutils align-default">
-<colgroup>
-<col style="width: 10%" />
-<col style="width: 90%" />
-</colgroup>
-<tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">GprofData</span></code>(path[, batch_size, surface_type])</p></td>
-<td><p>Pytorch dataset for the Gprof training data.</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="section" id="module-regn.data">
-<span id="reading-binary-data"></span><h3>Reading binary data<a class="headerlink" href="#module-regn.data" title="Permalink to this headline">¶</a></h3>
-<table class="longtable docutils align-default">
-<colgroup>
-<col style="width: 10%" />
-<col style="width: 90%" />
-</colgroup>
-<tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">read_file</span></code>(f)</p></td>
-<td><p>Read GPM binary file.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_sample</span></code>(data)</p></td>
-<td><p>Check that brightness temperatures are within a valid range.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">write_to_file</span></code>(file, data[, samples])</p></td>
-<td><p>Write data to NetCDF file.</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">create_output_file</span></code>(path)</p></td>
-<td><p>Creates netCDF4 output file to store training data in.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">extract_data</span></code>(base_path, y, m, d, samples, file)</p></td>
-<td><p>Extract training data from binary files for given year, month and day.</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-</div>
+<span id="data"></span><h1>data<a class="headerlink" href="#module-regn.data" title="Permalink to this headline">¶</a></h1>
 </div>
 
 
@@ -219,13 +218,6 @@ are working with in the project.</p>
            
           </div>
           <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-      
-        <a href="data.html" class="btn btn-neutral float-left" title="Data" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
-    </div>
   
 
   <hr/>
@@ -251,7 +243,7 @@ are working with in the project.</p>
 
   <script type="text/javascript">
       jQuery(function () {
-          SphinxRtdTheme.Navigation.enable(true);
+          SphinxRtdTheme.Navigation.enable(false);
       });
   </script>
 
