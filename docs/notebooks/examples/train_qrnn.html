@@ -37,9 +37,7 @@
   <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <link rel="index" title="Index" href="../../genindex.html" />
-    <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Datasets and -interfaces" href="../../api.data.html" />
-    <link rel="prev" title="Data" href="../../data.html" /> 
+    <link rel="search" title="Search" href="../../search.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -116,16 +114,6 @@
 <li class="toctree-l2"><a class="reference internal" href="../../data.html#documentation">Documentation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../data.html#training-data">Training data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../data.html#surface-types">Surface types</a></li>
-</ul>
-</li>
-</ul>
-<p class="caption"><span class="caption-text">Examples</span></p>
-<ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Training a QRNN</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#Defining-the-QRNN">Defining the QRNN</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#Loading-the-training-data">Loading the training data</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#Training-the-model">Training the model</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#Evaluating-the-QRNN">Evaluating the QRNN</a></li>
 </ul>
 </li>
 </ul>
@@ -443,7 +431,7 @@ div.rendered_html tbody tr:hover {
 </style>
 <div class="section" id="Training-a-QRNN">
 <h1>Training a QRNN<a class="headerlink" href="#Training-a-QRNN" title="Permalink to this headline">¶</a></h1>
-<p>This notebooke train a simple QRNN on a small subset of the training data.</p>
+<p>This notebooke trains a simple QRNN on the small set of training data.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
 </pre></div>
@@ -452,6 +440,7 @@ div.rendered_html tbody tr:hover {
 <span></span><span class="o">%</span><span class="k">load_ext</span> autoreload
 <span class="o">%</span><span class="k">autoreload</span> 2
 <span class="o">%</span><span class="k">matplotlib</span> inline
+<span class="kn">import</span> <span class="nn">ipywidgets</span> <span class="k">as</span> <span class="nn">w</span>
 <span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 </pre></div>
@@ -460,8 +449,8 @@ div.rendered_html tbody tr:hover {
 <div class="section" id="Defining-the-QRNN">
 <h2>Defining the QRNN<a class="headerlink" href="#Defining-the-QRNN" title="Permalink to this headline">¶</a></h2>
 <p>To create a <code class="docutils literal notranslate"><span class="pre">QRNN</span></code> we import the QRNN class from the <code class="docutils literal notranslate"><span class="pre">typhon</span></code> module. We define the quantiles that we want to predict and then instantiate the <code class="docutils literal notranslate"><span class="pre">QRNN</span></code> class providing as input arguments the number of input feature of the Gprof dataset (13 channels + 3 ancillary variables = 16), the quantiles and a tuple describing the architecture of the network. <code class="docutils literal notranslate"><span class="pre">(6,</span> <span class="pre">256,</span> <span class="pre">&quot;relu&quot;)</span></code> means that we want a fully-connected network with 6 hidden layers, each with 128 neurons and ReLU activation functions.</p>
-<div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
@@ -473,15 +462,23 @@ div.rendered_html tbody tr:hover {
 </pre></div>
 </div>
 </div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
+Using TensorFlow backend.
+</pre></div></div>
+</div>
 </div>
 <div class="section" id="Loading-the-training-data">
 <h2>Loading the training data<a class="headerlink" href="#Loading-the-training-data" title="Permalink to this headline">¶</a></h2>
-<p>Next, we load the training data. The <code class="docutils literal notranslate"><span class="pre">GprofData</span></code> class in the <code class="docutils literal notranslate"><span class="pre">regn.data</span></code> module implements the pytorch dataset interface so which makes it easier to use our data with <code class="docutils literal notranslate"><span class="pre">pytorch</span></code> models. We create an object of the class providing the file containing the training data and specifying the desired batch size for training. Then we split the data into training and validation part. The validation part is not presented to the model but is simply used to monitor the model error.</p>
+<p>Next, we load the training data. The <code class="docutils literal notranslate"><span class="pre">GprofData</span></code> class in the <code class="docutils literal notranslate"><span class="pre">regn.data</span></code> module implements the pytorch dataset interface, which makes it easier to use our data with <code class="docutils literal notranslate"><span class="pre">pytorch</span></code> models. We create an object of the class providing the file containing the training data and specifying the desired batch size for training. Then we split the data into training and validation part. The validation part is not presented to the model but is simply used to monitor the model error.</p>
 <blockquote>
 <div><p><strong>Note:</strong> This assumes that you copied the training data from the <code class="docutils literal notranslate"><span class="pre">regn/data</span></code> directory on Dendrite to a <code class="docutils literal notranslate"><span class="pre">data</span></code> subfolder in your <code class="docutils literal notranslate"><span class="pre">regn</span></code> project directory.</p>
 </div></blockquote>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
@@ -504,9 +501,8 @@ div.rendered_html tbody tr:hover {
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="n">qrnn</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_data</span><span class="p">,</span> <span class="n">validation_data</span><span class="p">,</span> <span class="n">n_epochs</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">lr</span> <span class="o">=</span> <span class="mf">1e-3</span><span class="p">,</span> <span class="n">momentum</span> <span class="o">=</span> <span class="mf">0.99</span><span class="p">,</span> <span class="n">gpu</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
-<span class="n">qrnn</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_data</span><span class="p">,</span> <span class="n">validation_data</span><span class="p">,</span> <span class="n">n_epochs</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">lr</span> <span class="o">=</span> <span class="mf">5e-4</span><span class="p">,</span> <span class="n">momentum</span> <span class="o">=</span> <span class="mf">0.99</span><span class="p">,</span> <span class="n">gpu</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
-<span class="n">qrnn</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_data</span><span class="p">,</span> <span class="n">validation_data</span><span class="p">,</span> <span class="n">n_epochs</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">lr</span> <span class="o">=</span> <span class="mf">1e-4</span><span class="p">,</span> <span class="n">momentum</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">gpu</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span>
+<span></span><span class="n">qrnn</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_data</span><span class="p">,</span> <span class="n">validation_data</span><span class="p">,</span> <span class="n">maximum_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">initial_learning_rate</span><span class="o">=</span><span class="mf">1e-2</span><span class="p">,</span> <span class="n">momentum</span><span class="o">=</span><span class="mf">0.99</span><span class="p">,</span> <span class="n">gpu</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">qrnn</span><span class="o">.</span><span class="n">train</span><span class="p">(</span><span class="n">training_data</span><span class="p">,</span> <span class="n">validation_data</span><span class="p">,</span> <span class="n">maximum_epochs</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">initial_learning_rate</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span> <span class="n">momentum</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">gpu</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -514,7 +510,7 @@ div.rendered_html tbody tr:hover {
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "55991555a77540e49265c57a7b763a1f", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "475566689ca34e26bc15869c2237cf6d", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -522,13 +518,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "e33280baa5ea429cbe7ea48e96600103", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "bf9c7d9f68284f5f9f82d68043909739", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -536,13 +533,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "bc9749f15d0c4a7c98e96a96a049c291", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "2a51f663d78340b9abfe0fbdcd4a4417", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -550,13 +548,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "c66df4375bce4c268c9ff27de384613b", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "e8240f168afb46bfb60668711122e540", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -564,13 +563,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "9b355cfee6d74c149e481242748db48e", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "ca67bd5826c949839a2127c6fab1af1e", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -578,13 +578,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "c991d9d41ff546ee93a175300d326a8b", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "e28b483c9ee742e8bcc733dea504f4dc", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -592,13 +593,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "01c09e05114d495aac2a5d8eabf6897b", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "47707e14f7f84060bf73f387e48eea92", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -606,13 +608,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "092eb93ef6624fe9b18a79e080de29d9", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "0051ed4fbf6f4e7e8724b039dbe0ec35", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -620,13 +623,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "89bd178c04a3497badb4a2944d1779af", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "bdf22b546fba44a088b35dc3ab783831", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -634,13 +638,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "f38411f5f7564d30b205f7c71528e74c", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "56e9385945484023a9100679dabe9e26", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -648,13 +653,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "e48fa5169a9d41cf8d7c620d0c6b10db", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "698a2dfa5e234d70afd1af4a9f96c8c1", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -662,13 +668,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "9fa076b02da14d47b3de8170c41501b7", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "bcef437f4810418a910a7a5f0d30465e", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -676,13 +683,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "3a769b18ba4749deb4e93c58aebbbf6f", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "2ac0fadfe5004e328de5034b3e87aaad", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -690,13 +698,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "bbc4b998b2bb48e99aa52ae30b8b3bfa", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "3793820b496248c7bf17db92a2b2044f", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -704,13 +713,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "51703570f1e44ca6b8a8ba314c8fb605", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "f8f02972ec2c45c1a52a67e6d4f8a499", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -718,13 +728,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "e5e8e53ed24e41c6a375db292b056143", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "91d7a677c09f465f9d12e5993cc58454", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -732,13 +743,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "c230c8d2802b478abf74bb49b775af4f", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "4017d26f3ef34effacfc194b5325afb5", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -746,13 +758,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "4defdbd946c44eebab31fb1543036dbc", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "a05a65acaf5e4f67840544e0248ef48f", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -760,13 +773,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "9d89d9f0d5964a49800a074c4acf0285", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "fd181513e86a484fa6e3f516a3d6f999", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -774,13 +788,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "415d6a981c634b90b2edae920bacdbae", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "1909b7028a3845019cf89208869b5a4d", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -788,13 +803,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "1a847914ea0148b7ae51719b31a7fa42", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "00aa2adfa1d741c5b7694e87b9d99d95", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -802,13 +818,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "efdfc413ced84b1c96ff6309c2c92fe0", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "14dbe5906d2b4c4ea27dba99c7045b35", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -816,13 +833,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "11c74775e8534c309a699427e4df696e", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "0491090c92484d7ca657ae6cd02b5f2f", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -830,13 +848,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "7c60e9b67da14cefa160cbfafcc757e1", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "8d58036372e846539c7e83583f600aa1", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -844,13 +863,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "5bd0f9a8b2714187abd8fda75677109b", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "884a2805ac1c4d70bcb1cbea460d8c04", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -858,13 +878,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "a8263b3bede6474eb035d34a491d3132", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "2027177f591a4758b2da8dcff8260b48", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -872,13 +893,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "ee46c0c986f9426194ba6035050adc96", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "ced486408bbc4799b5c1cde9a1c5f00f", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -886,13 +908,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "4696f7b0e5844abfbf8ac9dec781ef87", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "0da49c1bae924f33815ee2dd148d4415", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -900,13 +923,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "3acfc65513e04f62a00f1c8759526574", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "c51e46afc5094d6b9c190890b6b174c8", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
@@ -914,13 +938,164 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
 <div class="nboutput docutils container">
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "9f034bf077b04e91867c72963266d3b6", "version_major": 2, "version_minor": 0}</script></div>
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "db7f915877434b5f9b560440655dd2ee", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "409e4f4fd0e34f84a529b7d7cb7857c5", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "490dbd3befe04f4db6bff952666ce252", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "f430302d8269432c98c7316bae3e646c", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "9091c08d4cd240079af07ccb9e6b7dc3", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "dcab60a48a8a439d925b26a1b9354d8d", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "8286f7b4f8074df7b77c4b2db401d195", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "738f8be17d3a4ea8b76e458b25e34398", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "310d4f5214b741aa90fd7caa917d78dc", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "8210d060e31748af8139e6632379353b", "version_major": 2, "version_minor": 0}</script></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<script type="application/vnd.jupyter.widget-view+json">{"model_id": "f9952d40c2074adc88499349f9ee0bdb", "version_major": 2, "version_minor": 0}</script></div>
 </div>
 <div class="nboutput nblast docutils container">
 <div class="prompt empty docutils container">
@@ -928,11 +1103,14 @@ div.rendered_html tbody tr:hover {
 <div class="output_area docutils container">
 <div class="highlight"><pre>
 
+&lt;torch.utils.data.dataset.Subset object at 0x7fb76dfbe090&gt;
 </pre></div></div>
 </div>
-<p>Finally, we save the model to reuse it later.</p>
+</div>
+<div class="section" id="Finally,-we-save-the-model-to-reuse-it-later.">
+<h2>Finally, we save the model to reuse it later.<a class="headerlink" href="#Finally,-we-save-the-model-to-reuse-it-later." title="Permalink to this headline">¶</a></h2>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
@@ -944,8 +1122,8 @@ div.rendered_html tbody tr:hover {
 <div class="section" id="Evaluating-the-QRNN">
 <h2>Evaluating the QRNN<a class="headerlink" href="#Evaluating-the-QRNN" title="Permalink to this headline">¶</a></h2>
 <p>To ensure the training was successful, let’s plot the calibration of the predicted confidence intervals.</p>
-<div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
@@ -961,36 +1139,6 @@ div.rendered_html tbody tr:hover {
 </pre></div>
 </div>
 </div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<script type="application/vnd.jupyter.widget-view+json">{"model_id": "040a65b56c9341dfb3b153dacf071316", "version_major": 2, "version_minor": 0}</script></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-
-</pre></div></div>
-</div>
-<div class="nboutput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
-</pre></div>
-</div>
-<div class="output_area docutils container">
-<div class="highlight"><pre>
-Text(0, 0.5, &#39;Observed frequency&#39;)
-</pre></div></div>
-</div>
-<div class="nboutput nblast docutils container">
-<div class="prompt empty docutils container">
-</div>
-<div class="output_area docutils container">
-<img alt="notebooks/examples/../../../.doctrees/nbsphinx/notebooks_examples_train_qrnn_11_3.png" src="notebooks/examples/../../../.doctrees/nbsphinx/notebooks_examples_train_qrnn_11_3.png" />
-</div>
-</div>
 </div>
 </div>
 
@@ -999,15 +1147,6 @@ Text(0, 0.5, &#39;Observed frequency&#39;)
            
           </div>
           <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="../../api.data.html" class="btn btn-neutral float-right" title="Datasets and -interfaces" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="../../data.html" class="btn btn-neutral float-left" title="Data" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
-    </div>
   
 
   <hr/>
