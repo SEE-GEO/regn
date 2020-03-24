@@ -29,6 +29,7 @@ satellite observations of the Global Precipitation Measurement (`GPM
    :caption: Examples
    notebooks/examples/train_qrnn
    notebooks/examples/train_unet
+   notebooks/examples/qrnn_classification
 
 .. toctree::
    :maxdepth: 1
