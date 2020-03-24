@@ -21,12 +21,12 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
-        <script type="text/javascript" src="../../_static/jquery.js"></script>
-        <script type="text/javascript" src="../../_static/underscore.js"></script>
-        <script type="text/javascript" src="../../_static/doctools.js"></script>
-        <script type="text/javascript" src="../../_static/language_data.js"></script>
-        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/language_data.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
         <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})</script>
     
     <script type="text/javascript" src="../../_static/js/theme.js"></script>
@@ -37,7 +37,9 @@
   <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <link rel="index" title="Index" href="../../genindex.html" />
-    <link rel="search" title="Search" href="../../search.html" /> 
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Datasets and -interfaces" href="../../api.data.html" />
+    <link rel="prev" title="QRNN as classifier" href="../examples/qrnn_classification.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -114,6 +116,39 @@
 <li class="toctree-l2"><a class="reference internal" href="../../data.html#documentation">Documentation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../data.html#training-data">Training data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../data.html#surface-types">Surface types</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption"><span class="caption-text">Examples</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../examples/train_qrnn.html">Training a QRNN</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../examples/train_qrnn.html#Defining-the-QRNN">Defining the QRNN</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/train_qrnn.html#Loading-the-training-data">Loading the training data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/train_qrnn.html#Training-the-model">Training the model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/train_qrnn.html#Finally,-we-save-the-model-to-reuse-it-later.">Finally, we save the model to reuse it later.</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/train_qrnn.html#Evaluating-the-QRNN">Evaluating the QRNN</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../examples/train_unet.html">Fully-convolutional QRNN</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../examples/train_unet.html#Training-data">Training data</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../examples/train_unet.html#Training">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples/train_unet.html#Validation">Validation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples/qrnn_classification.html">QRNN as classifier</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../examples/qrnn_classification.html#Training-data">Training data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/qrnn_classification.html#Training">Training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/qrnn_classification.html#Evaluate-classifier">Evaluate classifier</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/qrnn_classification.html#True-probability">True probability</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption"><span class="caption-text">Results</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">QRNN Classification</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#Load-QRNN-and-data">Load QRNN and data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#Classify-test-data">Classify test data</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#Evaluate-performance">Evaluate performance</a></li>
 </ul>
 </li>
 </ul>
@@ -462,7 +497,7 @@ Using TensorFlow backend.
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">typhon.retrieval.qrnn</span> <span class="k">import</span> <span class="n">QRNN</span>
+<span></span><span class="kn">from</span> <span class="nn">typhon.retrieval.qrnn</span> <span class="kn">import</span> <span class="n">QRNN</span>
 <span class="n">qrnn</span> <span class="o">=</span> <span class="n">QRNN</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;../../models/qrnn_6_256_all_surfaces.nc&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -472,7 +507,7 @@ Using TensorFlow backend.
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">regn.data</span> <span class="k">import</span> <span class="n">GprofData</span>
+<span></span><span class="kn">from</span> <span class="nn">regn.data</span> <span class="kn">import</span> <span class="n">GprofData</span>
 <span class="n">test_data</span> <span class="o">=</span> <span class="n">GprofData</span><span class="p">(</span><span class="s2">&quot;../../data/test_data_small.nc&quot;</span><span class="p">,</span> <span class="n">batch_size</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -504,7 +539,7 @@ Using TensorFlow backend.
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">regn.utils</span> <span class="k">import</span> <span class="n">compute_roc</span>
+<span></span><span class="kn">from</span> <span class="nn">regn.utils</span> <span class="kn">import</span> <span class="n">compute_roc</span>
 <span class="n">fpr</span><span class="p">,</span> <span class="n">tpr</span> <span class="o">=</span> <span class="n">compute_roc</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span> <span class="n">y_true</span> <span class="o">&gt;</span> <span class="n">threshold</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">21</span><span class="p">))</span>
 </pre></div>
 </div>
@@ -534,7 +569,7 @@ Text(0.5, 1.0, &#39;Receiver-operator chracacteristic&#39;)
 <div class="prompt empty docutils container">
 </div>
 <div class="output_area docutils container">
-<img alt="notebooks/classification/../../../.doctrees/nbsphinx/notebooks_classification_test_classification_9_1.png" src="notebooks/classification/../../../.doctrees/nbsphinx/notebooks_classification_test_classification_9_1.png" />
+<img alt="../../_images/notebooks_classification_test_classification_9_1.png" src="../../_images/notebooks_classification_test_classification_9_1.png" />
 </div>
 </div>
 </div>
@@ -545,6 +580,15 @@ Text(0.5, 1.0, &#39;Receiver-operator chracacteristic&#39;)
            
           </div>
           <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../../api.data.html" class="btn btn-neutral float-right" title="Datasets and -interfaces" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="../examples/qrnn_classification.html" class="btn btn-neutral float-left" title="QRNN as classifier" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
   
 
   <hr/>
