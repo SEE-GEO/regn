@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Aim &mdash; REGN 0.1 documentation</title>
+  <title>Overview &mdash; REGN 0.1 documentation</title>
   
 
   
@@ -106,12 +106,19 @@
 <li class="toctree-l2"><a class="reference internal" href="documentation.html#format">Format</a></li>
 <li class="toctree-l2"><a class="reference internal" href="documentation.html#restructuredtext">reStructuredText</a></li>
 <li class="toctree-l2"><a class="reference internal" href="documentation.html#building-the-documentation">Building the documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="documentation.html#viewing-the-documentation">Viewing the documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="documentation.html#including-jupyter-notebooks">Including Jupyter notebooks</a></li>
 </ul>
 </li>
 </ul>
 <p class="caption"><span class="caption-text">REGN</span></p>
 <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Aim</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#quantile-regression">Quantile regression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#gprof">GProf</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#geostationary-imagery">Geostationary Imagery</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="data.html">Data</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="data.html#documentation">Documentation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data.html#training-data">Training data</a></li>
@@ -203,7 +210,7 @@
     
       <li><a href="index.html">Docs</a> &raquo;</li>
         
-      <li>Aim</li>
+      <li>Overview</li>
     
     
       <li class="wy-breadcrumbs-aside">
@@ -246,11 +253,41 @@
     text-align: unset;
 }
 </style>
-<div class="section" id="aim">
-<h1>Aim<a class="headerlink" href="#aim" title="Permalink to this headline">¶</a></h1>
-<p>The aim of this project is to investigate the potential benefits of replacing
-the MCI approach currently used in the GPROF algorithm using QRNNs. Or in other
-words, we want to reimplement GPROF using neural networks.</p>
+<div class="section" id="overview">
+<h1>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h1>
+<p>The REGN project aims to produce more robust and potentially more accurate
+retrievals of precipitation from satellite imagery through the use of machine
+learning. The project comprises methodological development as well as case-specific
+applications which investigate the benefits of the developed methods for
+specific retrieval problems.</p>
+<div class="section" id="quantile-regression">
+<h2>Quantile regression<a class="headerlink" href="#quantile-regression" title="Permalink to this headline">¶</a></h2>
+<p>An important property of precipitation retrievals setting them apart from other
+machine learning problems is the inherent (<em>aleatoric</em>) uncertainties which
+typically dominates the model (<em>epistemic</em>) uncertainty. In othe words, given
+a sufficiently flexible model, there is usually sufficient data available to
+accurately determine model parameters, but nonetheless the retrieval will be
+affected by significant uncertainties caused by the ill-posedness of the
+retrieval problem.</p>
+<p>In a <a class="reference external" href="https://www.atmos-meas-tech.net/11/4627/2018/">previous study</a>, we have
+shown that using quantile regression neural networks can be used to produce
+well-calibrated estimates of aleatoric uncertainty. Moreover, we showed that they
+are compatible with the Bayesian framework that is traditionally applied for
+precipitation retrievals, making them a powerful alternative which may overcome
+some of the limitation of traditional retrieval methods.</p>
+</div>
+<div class="section" id="gprof">
+<h2>GProf<a class="headerlink" href="#gprof" title="Permalink to this headline">¶</a></h2>
+<p>We are currently investigating the use of QRNNs in the processing of the Goddard
+Profiling (GProf) Algorithm. The GProf algorithm is used to produce the global
+precipitation product from the Global Precipitation Measurement (<a class="reference external" href="https://www.nasa.gov/mission_pages/GPM/main/index.html">GPM</a>) mission.</p>
+</div>
+<div class="section" id="geostationary-imagery">
+<h2>Geostationary Imagery<a class="headerlink" href="#geostationary-imagery" title="Permalink to this headline">¶</a></h2>
+<p>Furthermore, we are investigating using QRNNs to produce precipitation estimates
+from geostationary observations. Here we are particularly interested in leveraging
+information contained in spatial structure to improve the retrievals.</p>
+</div>
 </div>
 
 

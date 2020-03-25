@@ -106,6 +106,8 @@
 <li class="toctree-l2"><a class="reference internal" href="#format">Format</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#restructuredtext">reStructuredText</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#building-the-documentation">Building the documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#viewing-the-documentation">Viewing the documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#including-jupyter-notebooks">Including Jupyter notebooks</a></li>
 </ul>
 </li>
 </ul>
@@ -248,9 +250,9 @@
 </style>
 <div class="section" id="documentation">
 <h1>Documentation<a class="headerlink" href="#documentation" title="Permalink to this headline">¶</a></h1>
-<p>Just like science, code is much more useful when it’s properly documented.
-For this project, we use <a class="reference external" href="https://www.sphinx-doc.org/en/stable/">Sphinx</a>,
-which is arguably the most common framework to document Python projects.</p>
+<p>Just like any scientific analysis, code is much more useful when it’s properly
+documented. For this project, we use <a class="reference external" href="https://www.sphinx-doc.org/en/stable/">Sphinx</a>, which is arguably the most common
+framework to document Python projects.</p>
 <div class="section" id="format">
 <h2>Format<a class="headerlink" href="#format" title="Permalink to this headline">¶</a></h2>
 <p>The documentation consists of source files, which can be found in the
@@ -263,9 +265,9 @@ PDF document or a tree of HTML files that can be hosted online.</p>
 <div class="section" id="restructuredtext">
 <h2>reStructuredText<a class="headerlink" href="#restructuredtext" title="Permalink to this headline">¶</a></h2>
 <p>The documentation is written using <a class="reference external" href="https://www.sphinx-doc.org/en/stable/usage/restructuredtext/basics.html">reStructuredText</a>
-markup language. It provides a simple way to add structures to documents
-written in plain text. For example you can make a line a section heading
-by underlining it with <code class="code docutils literal notranslate"><span class="pre">=</span></code>:</p>
+markup language. It provides a simple way to structure documents written in
+plain text. For example you can make a line a section heading by underlining it
+with <code class="code docutils literal notranslate"><span class="pre">=</span></code>:</p>
 <div class="highlight-rst notranslate"><div class="highlight"><pre><span></span><span class="gh">Section</span>
 <span class="gh">=======</span>
 </pre></div>
@@ -281,13 +283,49 @@ subfolder and run the following command:</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>sphinx-build source .
 </pre></div>
 </div>
-<p>This will create build the HTML file that make up the documentation hosted
-on <a class="reference external" href="https://simonpf.github.com/regn">simonpf.github.com/regn</a>.</p>
+</div>
+<div class="section" id="viewing-the-documentation">
+<h2>Viewing the documentation<a class="headerlink" href="#viewing-the-documentation" title="Permalink to this headline">¶</a></h2>
+<p>By default, <code class="code docutils literal notranslate"><span class="pre">sphinx-build</span></code> generates documentation in HTML format. You
+can view the documentation by opening the <code class="code docutils literal notranslate"><span class="pre">index.html</span></code> document in
+the <code class="code docutils literal notranslate"><span class="pre">docs</span></code> folder.</p>
+<p>The HTML documents in the <code class="code docutils literal notranslate"><span class="pre">docs</span></code> folder are also hosted on the GitHub pages
+site <a class="reference external" href="https://simonpf.github.com/regn">simonpf.github.com/regn</a>. The GitHub
+pages service simply hosts the content of the <code class="code docutils literal notranslate"><span class="pre">docs</span></code> folder, so to update
+the online documentation it is sufficient to push the changed html documents
+to the remote repository.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>If you add documentation to the project that results in a new HTML file in
 the <code class="code docutils literal notranslate"><span class="pre">docs</span></code> folder, you will need to add this to git and push to the
 central repository for it to become available on <a class="reference external" href="https://simonpf.github.com/regn">simonpf.github.com/regn</a>.</p>
+</div>
+</div>
+<div class="section" id="including-jupyter-notebooks">
+<h2>Including Jupyter notebooks<a class="headerlink" href="#including-jupyter-notebooks" title="Permalink to this headline">¶</a></h2>
+<p>We are using <a class="reference external" href="https://pypi.org/project/nbsphinx/">nbsphinx</a> to include notebooks
+in this documentation. In this way we can combine all project documentation in a
+single document.</p>
+<p>To include a Jupyer notebook located in the  <code class="code docutils literal notranslate"><span class="pre">notebooks</span></code> directory, two
+steps are necessary:</p>
+<ol class="arabic simple">
+<li><p>You need to first create a symbolic link in the <code class="code docutils literal notranslate"><span class="pre">docs/notebooks</span></code> directory.
+For the <code class="code docutils literal notranslate"><span class="pre">train_qrnn.ipynb</span></code> notebook for example the corresponding command would be:</p></li>
+</ol>
+<blockquote>
+<div><div class="highlight-none notranslate"><div class="highlight"><pre><span></span>ln notebooks/examples/train_qrnn.ipynb docs/notebooks/examples/train_qrnn.ipynb
+</pre></div>
+</div>
+</div></blockquote>
+<ol class="arabic simple" start="2">
+<li><p>The notebook can then be included in the documentation as follows:</p></li>
+</ol>
+<div class="highlight-rst notranslate"><div class="highlight"><pre><span></span><span class="p">..</span> <span class="ow">toctree</span><span class="p">::</span>
+  <span class="nc">:maxdepth:</span> 1
+  <span class="nc">:caption:</span> Examples
+
+  notebooks/examples/train_qrnn
+</pre></div>
 </div>
 </div>
 </div>
