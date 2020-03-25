@@ -21,12 +21,12 @@
   
     
       <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
-        <script src="../../_static/jquery.js"></script>
-        <script src="../../_static/underscore.js"></script>
-        <script src="../../_static/doctools.js"></script>
-        <script src="../../_static/language_data.js"></script>
-        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
-        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/javascript" src="../../_static/jquery.js"></script>
+        <script type="text/javascript" src="../../_static/underscore.js"></script>
+        <script type="text/javascript" src="../../_static/doctools.js"></script>
+        <script type="text/javascript" src="../../_static/language_data.js"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
         <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})</script>
     
     <script type="text/javascript" src="../../_static/js/theme.js"></script>
@@ -106,12 +106,19 @@
 <li class="toctree-l2"><a class="reference internal" href="../../documentation.html#format">Format</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../documentation.html#restructuredtext">reStructuredText</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../documentation.html#building-the-documentation">Building the documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../documentation.html#viewing-the-documentation">Viewing the documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../documentation.html#including-jupyter-notebooks">Including Jupyter notebooks</a></li>
 </ul>
 </li>
 </ul>
 <p class="caption"><span class="caption-text">REGN</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../overview.html">Aim</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../overview.html">Overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../overview.html#quantile-regression">Quantile regression</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../overview.html#gprof">GProf</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../overview.html#geostationary-imagery">Geostationary Imagery</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="../../data.html">Data</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="../../data.html#documentation">Documentation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../../data.html#training-data">Training data</a></li>
@@ -498,7 +505,7 @@ The autoreload extension is already loaded. To reload it, use:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">scipy.signal</span> <span class="kn">import</span> <span class="n">convolve</span>
+<span></span><span class="kn">from</span> <span class="nn">scipy.signal</span> <span class="k">import</span> <span class="n">convolve</span>
 
 <span class="k">def</span> <span class="nf">create_data</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
     <span class="n">w</span> <span class="o">=</span> <span class="mi">64</span>
@@ -540,8 +547,8 @@ The autoreload extension is already loaded. To reload it, use:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">matplotlib.colors</span> <span class="kn">import</span> <span class="n">Normalize</span>
-<span class="kn">from</span> <span class="nn">matplotlib.gridspec</span> <span class="kn">import</span> <span class="n">GridSpec</span>
+<span></span><span class="kn">from</span> <span class="nn">matplotlib.colors</span> <span class="k">import</span> <span class="n">Normalize</span>
+<span class="kn">from</span> <span class="nn">matplotlib.gridspec</span> <span class="k">import</span> <span class="n">GridSpec</span>
 <span class="k">def</span> <span class="nf">plot_data</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">n</span> <span class="o">=</span> <span class="mi">4</span><span class="p">):</span>
     <span class="n">f</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span> <span class="o">=</span> <span class="p">(</span><span class="n">n</span> <span class="o">*</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
     <span class="n">gs</span> <span class="o">=</span> <span class="n">GridSpec</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">height_ratios</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">]</span> <span class="o">*</span> <span class="n">n</span> <span class="o">+</span> <span class="p">[</span><span class="mf">0.1</span><span class="p">])</span>
@@ -594,8 +601,8 @@ The autoreload extension is already loaded. To reload it, use:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">typhon.retrieval.qrnn</span> <span class="kn">import</span> <span class="n">QRNN</span>
-<span class="kn">from</span> <span class="nn">typhon.retrieval.qrnn.models.pytorch</span> <span class="kn">import</span> <span class="n">UNet</span>
+<span></span><span class="kn">from</span> <span class="nn">typhon.retrieval.qrnn</span> <span class="k">import</span> <span class="n">QRNN</span>
+<span class="kn">from</span> <span class="nn">typhon.retrieval.qrnn.models.pytorch</span> <span class="k">import</span> <span class="n">UNet</span>
 <span class="n">skip_connection</span> <span class="o">=</span> <span class="s2">&quot;all&quot;</span>
 <span class="n">quantiles</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.25</span><span class="p">,</span> <span class="mf">0.35</span><span class="p">,</span> <span class="mf">0.45</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.55</span><span class="p">,</span> <span class="mf">0.65</span><span class="p">,</span> <span class="mf">0.75</span><span class="p">,</span> <span class="mf">0.85</span><span class="p">,</span> <span class="mf">0.95</span><span class="p">])</span>
 <span class="n">unet</span> <span class="o">=</span> <span class="n">UNet</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">quantiles</span><span class="p">,</span> <span class="n">skip_connection</span><span class="o">=</span><span class="n">skip_connection</span><span class="p">)</span>
@@ -824,8 +831,8 @@ array([0.05, 0.15, 0.25, 0.35, 0.45, 0.5 , 0.55, 0.65, 0.75, 0.85, 0.95])
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">matplotlib.colors</span> <span class="kn">import</span> <span class="n">Normalize</span>
-<span class="kn">from</span> <span class="nn">matplotlib.gridspec</span> <span class="kn">import</span> <span class="n">GridSpec</span>
+<span></span><span class="kn">from</span> <span class="nn">matplotlib.colors</span> <span class="k">import</span> <span class="n">Normalize</span>
+<span class="kn">from</span> <span class="nn">matplotlib.gridspec</span> <span class="k">import</span> <span class="n">GridSpec</span>
 <span class="k">def</span> <span class="nf">plot_result</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">y_pred</span><span class="p">):</span>
     <span class="n">f</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span> <span class="o">=</span> <span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">4</span><span class="p">))</span>
     <span class="n">gs</span> <span class="o">=</span> <span class="n">GridSpec</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="n">height_ratios</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">])</span>
