@@ -147,14 +147,3 @@ class BinaryClassification(Dataset):
 
         plt.tight_layout()
         return f
-
-bc = BinaryClassification(10)
-
-import matplotlib.pyplot as plt
-
-plt.rc('text', usetex=True)
-plt.rc('text.latex', preamble=r'\usepackage{amsmath}\usepackage{lmodern}\usepackage{units}')
-f = bc.plot_data()
-
-f, ax = plt.subplots(1, 1)
-ax.set_ylabel(r"Latitude [$\unit{^\circ\ N}$]")
