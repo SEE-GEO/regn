@@ -96,7 +96,6 @@ class ImageGradients(Dataset):
             i(int): The index of the sample to return
         """
         if i > len(self) and self.shuffle:
-            print("shuffling")
             self.inds = np.random.permutation(np.arange(n))
 
         i_start = self.batch_size * i
@@ -120,9 +119,8 @@ class ImageGradients(Dataset):
             indices = np.random.randint(self.x.shape[0], size=indices)
 
         n = len(indices)
-        print(n)
 
-        f = plt.figure(figsize = (5, n * 3))
+        f = plt.figure(figsize = (8, n * 5))
         gs = GridSpec(n + 1, 2, height_ratios = [1.0] * n + [0.1])
         norm_x = Normalize(-0.2, 0.2)
         norm_y = Normalize(-0.05, 0.05)
