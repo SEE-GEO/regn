@@ -100,8 +100,8 @@ class ImageGradients(Dataset):
 
         i_start = self.batch_size * i
         i_end = self.batch_size * (i + 1)
-        return (torch.tensor(self.x[i_start : i_end]),
-                torch.tensor(self.y[i_start : i_end]))
+        return (torch.tensor(self.x[i_start : i_end]).float(),
+                torch.tensor(self.y[i_start : i_end]).float())
 
     def plot_data(self, indices = None):
         """
