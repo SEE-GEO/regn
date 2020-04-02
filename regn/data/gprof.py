@@ -269,3 +269,65 @@ def extract_data(base_path,
             with open(f, 'rb') as fn:
                 data = read_file(fn)
                 write_to_file(file, data, samples = n)
+
+################################################################################
+# GProf spatial data
+################################################################################
+
+class GprofSpatialData:
+    def __init__(self, filename, n = -1):
+        self.file = Dataset(filename)
+
+        x = self.file["x"][:n, :, :, :]
+
+        valid = []
+        x_normed = np.zeros(x.shape, dtype=np.float32)
+
+        self.x_mins = np.zeros(x.shape[-1])
+        self.x_maxs = np.zeros(x.shape[-1])
+
+        for i in range(x.shape[-1]):
+
+            valid = np.logical_and(x[:, :, :, i] > 0.0,
+                                   x[:, :, :, i] < 500.0)
+            x_min = x[valid, i].min()
+            x_max = x[valid, i].max()
+            x_normed[:, :, :, i] = -0.9 + 1.9 * (x[:, :, :, i] - x_min) / (x_max - x_min)
+            x_normed[~valid, i] = -1.0
+            self.x_maxs[i] = x_max
+            self.x_mins[i] = x_min
+
+        self.x = np.transpose(x_normed, (0, 3, 1, 2))
+
+        self.y = self.file["y"][:n, :, :]
+        valid = self.y >= 0.0
+        self.y[~valid] = -1.0
+
+        n = self.y.shape[1] // 2
+        self.y[:, :, :n - 10] = -1
+        self.y[:, :, (n + 10) :] = -1
+
+    def __len__(self):
+        return self.x.shape[0]
+
+    def __getitem__(self, index):
+        x = torch.tensor(self.x[index, :, 3:-2, 3:-2])
+        y = torch.tensor(self.y[index, 3:-2, 3:-2])
+        y[:10, :] = -1
+        y[-10:, :] = -1
+        return (x, y)
+
+    def plot_colocation(self):
+
+        ind = np.random.randint(self.x.shape[0])
+
+        f = plt.figure(figsize = (16, 4))
+        gs = GridSpec(1, 4)
+
+        for i, j in enumerate([5, 9, 12]):
+            ax = plt.subplot(gs[i])
+            ax.pcolormesh(self.x[ind, :, :, j])
+
+        ax = plt.subplot(gs[-1])
+        ax.pcolormesh(self.y[ind, :, :])
+        return f
