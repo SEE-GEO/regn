@@ -38,7 +38,7 @@ In the GPROF algorithm the ancillary input data is used to preselect a retrieval
 database. This means that, depending of the values of these three variables, a
 different retrieval database with different a priori statistics is used.
 
-Training and test data is available in the :code:`regn` project directory on
+Training and test data is available in the :code:`REGN` project directory on
 Dendrite in the :code:`data` subfolder. The data is stored as NetCDF4 file and
 contains the following variables:
 

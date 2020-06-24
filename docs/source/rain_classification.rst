@@ -28,4 +28,5 @@ Discussion
 Other questions
 ===============
 
+- Any advantage of predicting rain in log-scale?
 - What rain threshold should be used? Gustav used :math:`0.1\ \text{mm\ h}^{-1}`
