@@ -33,7 +33,7 @@ years = [14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15]
 file = create_output_file(output)
 for y, m in zip(years, months):
     _, n_days = monthrange(2000 + y, m)
-    days = np.arange(2, n_days + 1)
+    days = np.arange(5, n_days + 1)
     print("Processing {}/{}".format(y, m))
     for d in tqdm.tqdm(days):
         extract_data(data_path, y, m, d, samples, file)

@@ -4,6 +4,7 @@ import os
 import netCDF4
 import torch
 from torch.utils.data import Dataset
+import xarray
 
 ################################################################################
 # Torch dataloader interface
@@ -21,7 +22,9 @@ class GprofData(Dataset):
     def __init__(self,
                  path,
                  batch_size = None,
-                 surface_type = -1):
+                 surface_type = -1,
+                 normalization_data=None,
+                 log_rain_rates=False):
         """
         Create instance of the dataset from a given file path.
 
@@ -31,18 +34,30 @@ class GprofData(Dataset):
             surface_type: If positive, only samples of the given surface type
                 are provided. Otherwise the surface type index is provided as
                 input features.
+            normalization_data: Filename of normalization data to use to
+                normalize inputs.
+            log_rain_rates: Boolean indicating whether or not to transform output
+                to log space.
         """
         super().__init__()
         self.batch_size = batch_size
 
         self.file = netCDF4.Dataset(path, mode = "r")
 
+        if not normalization_data is None:
+            self.normalization_data = xarray.open_dataset(normalization_data)
+
         tcwv = self.file.variables["tcwv"][:]
         surface_type_data = self.file.variables["surface_type"][:]
         t2m = self.file.variables["t2m"][:]
         bt = self.file.variables["brightness_temperature"][:]
-        bt_min = self.file.variables["bt_min"][:].reshape(1, -1)
-        bt_max = self.file.variables["bt_max"][:].reshape(1, -1)
+
+        if not normalization_data is None:
+            bt_mean = self.normalization_data["bt_mean"]
+            bt_std = self.normalization_data["bt_std"]
+        else:
+            bt_mean = bt.mean(keepdims=True)
+            bt_std = bt.std(keepdims=True)
 
         valid = surface_type_data > 0
         valid *= t2m > 0
@@ -53,31 +68,52 @@ class GprofData(Dataset):
         inds = np.random.permutation(np.where(valid)[0])
 
         tcwv = tcwv[inds].reshape(-1, 1)
-        tcwv_min = tcwv.min()
-        tcwv_max = tcwv.max()
-        tcwv = (tcwv - tcwv.min()) / (tcwv.max() - tcwv.min())
+        if not normalization_data is None:
+            tcwv_mean = self.normalization_data["tcwv_mean"]
+            tcwv_std = self.normalization_data["tcwv_std"]
+        else:
+            tcwv_mean = tcwv.mean(keepdims=True)
+            tcwv_std = tcwv.std(keepdims=True)
+        tcwv = (tcwv - tcwv_mean) / tcwv_std
 
         t2m = t2m[inds].reshape(-1, 1)
-        t2m_min = t2m.min()
-        t2m_max = t2m.max()
-        t2m = (t2m - t2m.min()) / (t2m.max() - t2m.min())
+        if not normalization_data is None:
+            t2m_mean = self.normalization_data["t2m_mean"]
+            t2m_std = self.normalization_data["t2m_std"]
+        else:
+            t2m_mean = t2m.mean(keepdims=True)
+            t2m_std = t2m.std(keepdims=True)
+        t2m = (t2m - t2m_mean) / t2m_std
 
         surface_type_data = surface_type_data[inds].reshape(-1, 1)
-        surface_type_min = surface_type_data.min()
-        surface_type_max = surface_type_data.max()
-        surface_type_data = ((surface_type_data - surface_type_min)
-                             / (surface_type_max - surface_type_min))
+        surface_type_min = 1
+        surface_type_max = 14
+        n_classes = int(surface_type_max - surface_type_min)
+        surface_type_1h = np.zeros((surface_type_data.size, n_classes), dtype=np.float32)
+        indices = (surface_type_data - surface_type_min).astype(int)
+        surface_type_1h[indices] = 1.0
 
         bt = bt[inds]
-        bt = (bt - bt_min) / (bt_max - bt_min)
+        bt = (bt - bt.mean(keepdims=True)) / bt.std(keepdims=True)
 
         if surface_type < 0:
-            self.x = np.concatenate([bt, t2m, tcwv, surface_type_data], axis=1)
+            self.x = np.concatenate([bt, t2m, tcwv, surface_type_1h], axis=1)
         else:
             self.x = np.concatenate([bt, t2m, tcwv], axis=1)
         self.x = self.x.data
         self.y = self.file.variables["surface_precipitation"][inds]
         self.y = self.y.data
+        self.input_features = self.x.shape[1]
+
+        self.normalization_data = xarray.Dataset({"bt_mean" : (("samples", "channels"), bt_mean),
+                                                  "bt_std"  : (("samples", "channels"), bt_std),
+                                                  "tcwv_mean" : (("samples", "tcwv"), tcwv_mean),
+                                                  "tcwv_std"  : (("samples", "tcwv"), tcwv_std),
+                                                  "t2m_mean"  : (("samples", "t2m"), t2m_mean),
+                                                  "t2m_std"   : (("samples", "t2m"), t2m_std)})
+
+        if log_rain_rates:
+            self.transform_log()
 
     def __len__(self):
         """
@@ -100,14 +136,46 @@ class GprofData(Dataset):
         Args:
             i(int): The index of the sample to return
         """
+        if (i == 0):
+            indices = np.random.permutation(self.x.shape[0])
+            self.x = self.x[indices, :]
+            self.y = self.y[indices]
+
         if self.batch_size is None:
             return (torch.tensor(self.x[[i], :]),
                     torch.tensor(self.y[[i]]))
         else:
             i_start = self.batch_size * i
             i_end = self.batch_size * (i + 1)
+            if i >= len(self):
+                raise IndexError()
             return (torch.tensor(self.x[i_start : i_end, :]),
                     torch.tensor(self.y[i_start : i_end]))
+
+    def transform_log(self):
+        """
+        Transforms output rain rates to log space. Samples with
+        zero rain are replaced by uniformly sampling values from the
+        range [0, rr.min()].
+        """
+        y = np.copy(self.y)
+        y_min = y[y > 0.0].min()
+        inds = y == 0.0
+        y[inds] = np.random.uniform(0.0, y_min, inds.sum())
+        y = np.log10(y)
+        self.y = y
+
+
+    def store_normalization_data(self, filename):
+        """
+        Store means and standard deviations used to normalize input data in
+        a NetCDF4 file.
+
+        Args:
+            filename: Path of  the file to which to write the normalization
+                data.
+        """
+        self.normalization_data.to_netcdf(filename)
 
 ################################################################################
 # Interface to binary data.

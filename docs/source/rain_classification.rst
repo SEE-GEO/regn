@@ -14,8 +14,6 @@ Approaches
    threshold.
 3. Use a loss function that yields well-calibrated probabilities (how?).
 
-
-
 Discussion
 ==========
 
@@ -29,4 +27,4 @@ Other questions
 ===============
 
 - Any advantage of predicting rain in log-scale?
-- What rain threshold should be used? Gustav used :math:`0.1\ \text{mm\ h}^{-1}`
+- What rain threshold should be used? Gustav used :math:`0.1 \text{mm\ h}^{-1}`
