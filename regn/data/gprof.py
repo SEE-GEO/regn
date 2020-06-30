@@ -24,7 +24,8 @@ class GprofData(Dataset):
                  batch_size = None,
                  surface_type = -1,
                  normalization_data=None,
-                 log_rain_rates=False):
+                 log_rain_rates=False,
+                 rain_threshold=None):
         """
         Create instance of the dataset from a given file path.
 
@@ -38,6 +39,9 @@ class GprofData(Dataset):
                 normalize inputs.
             log_rain_rates: Boolean indicating whether or not to transform output
                 to log space.
+            rain_threshold: If provided, the given value is applied to the
+                output rain rates to turn them into binary non-raining / raining
+                labels.
         """
         super().__init__()
         self.batch_size = batch_size
@@ -114,6 +118,10 @@ class GprofData(Dataset):
 
         if log_rain_rates:
             self.transform_log()
+
+        if rain_threshold:
+            self.y = (self.y > rain_threshold).astype(np.float32)
+
 
     def __len__(self):
         """
