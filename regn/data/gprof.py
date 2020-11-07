@@ -190,7 +190,12 @@ class GprofData(Dataset):
 ################################################################################
 
 types =  [('nx', 'i4'), ('ny', 'i4')]
-types += [('year', 'i4'), ('month', 'i4'), ('day', 'i4'), ('hour', 'i4'), ('minute', 'i4'), ('second', 'i4')]
+types += [('year', 'i4'),
+          ('month', 'i4'),
+          ('day', 'i4'),
+          ('hour', 'i4'),
+          ('minute', 'i4'),
+          ('second', 'i4')]
 types +=  [('lat', 'f4'), ('lon', 'f4')]
 types += [('sfccode', 'i4'), ('tcwv', 'i4'), ('T2m', 'i4')]
 types += [('Tb_{}'.format(i), 'f4') for i in range(13)]
