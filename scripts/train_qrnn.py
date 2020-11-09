@@ -54,7 +54,7 @@ set_backend("pytorch")
 quantiles = np.array([0.01, 0.1, 0.2, 0.3, 0.4, 0.45, 0.5, 0.55, 0.6, 0.7, 0.8, 0.9, 0.99])
 model = FullyConnected(training_data.input_features, quantiles, 6, 128)
 model.quantiles = quantiles
-model.backend = typhon.retrieval.qrnn.qrnn.backend
+model.backend = "typhon.retrieval.qrnn.models.pytorch"
 qrnn = QRNN(20, model=model)
 
 qrnn.train(training_data=training_data,
