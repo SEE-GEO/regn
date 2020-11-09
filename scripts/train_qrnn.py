@@ -6,6 +6,7 @@ from regn.data import MHSData
 from regn.models.torch import FullyConnected
 from typhon.retrieval.qrnn import set_backend, QRNN
 import typhon.retrieval.qrnn.qrnn
+from torch.utils.data import DataLoader
 
 ###############################################################################
 # Command line arguments.
@@ -41,10 +42,12 @@ network_name = f"qrnn_{n_layers}_{n_neurons}.pt"
 #
 
 training_data = MHSData(training_data,
-                        batch_size=256)
+                        batch_size=512)
 validation_data = MHSData(validation_data,
-                          batch_size=256,
-                          normalizer=training_data.normalizer)
+                          normalizer=training_data.normalizer,
+                          batch_size=512)
+training_data = DataLoader(training_data, batch_size=None, num_workers=4, pin_memory=True)
+validation_data = DataLoader(validation_data, batch_size=None, num_workers=4, pin_memory=True)
 
 #
 # Create model
@@ -52,7 +55,7 @@ validation_data = MHSData(validation_data,
 
 set_backend("pytorch")
 quantiles = np.array([0.01, 0.1, 0.2, 0.3, 0.4, 0.45, 0.5, 0.55, 0.6, 0.7, 0.8, 0.9, 0.99])
-model = FullyConnected(training_data.input_features, quantiles, 6, 128)
+model = FullyConnected(training_data.dataset.input_features, quantiles, 6, 128)
 model.quantiles = quantiles
 model.backend = "typhon.retrieval.qrnn.models.pytorch"
 qrnn = QRNN(20, model=model)
