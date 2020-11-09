@@ -81,12 +81,12 @@ class GMIBinaryFile:
             filename(``pathlib.Path``): The file to open.
         """
         self.header = np.memmap(filename,
-                                dtype=HEADER_TYPES_MHS,
+                                dtype=HEADER_TYPES_GMI,
                                 mode="r",
                                 shape=(1,))
         self.pixels = np.memmap(filename,
-                                dtype=PIXEL_TYPES_MHS,
-                                offset=70,
+                                dtype=PIXEL_TYPES_GMI,
+                                offset= 10 + 8 * 13,
                                 mode="r")
 
     @classmethod
@@ -189,7 +189,7 @@ class GMIBinaryFile:
             sp = d[26]
             v_surf_precip[i] = sp
             cp = d[27]
-            v_conv_precip[i, j] = cp
+            v_conv_precip[i] = cp
             n_extracted += 1
 
 
@@ -258,6 +258,9 @@ class MHSBinaryFile:
                             dimensions=("samples",
                                         "viewing_angles",
                                         "channels"))
+        file.createVariable("viewing_angles", "f4", dimensions=("viewing_angles",))
+        file.createVariable("frequencies", "f4", dimensions=("channels",))
+
         file.createVariable("tbs_min", "f4", dimensions=("viewing_angles",
                                                          "channels"))
         file.createVariable("tbs_max", "f4", dimensions=("viewing_angles",
@@ -265,10 +268,8 @@ class MHSBinaryFile:
         file.createVariable("latitude", "f4", dimensions=("samples",))
         file.createVariable("longitude", "f4", dimensions=("samples",))
         file.createVariable("surface_type", "f4", dimensions=("samples",))
-        file.createVariable("tcwv", "f4", dimensions=("samples",
-                                                      "viewing_angles"))
-        file.createVariable("t2m", "f4", dimensions=("samples",
-                                                       "viewing_angles"))
+        file.createVariable("tcwv", "f4", dimensions=("samples"))
+        file.createVariable("t2m", "f4", dimensions=("samples"))
         file.createVariable("surface_precipitation",
                             "f4",
                             dimensions=("samples",
@@ -285,6 +286,8 @@ class MHSBinaryFile:
         file.createVariable("minute", "i4", dimensions=("samples",))
         file.createVariable("second", "i4", dimensions=("samples",))
 
+        file["viewing_angles"][:] = [mhs_data.header[0][i] for i in range(7, 17)]
+        file["frequencies"][:] = [mhs_data.header[0][i] for i in range(2, 7)]
         file["tbs_min"][:] = 1e30
         file["tbs_max"][:] = 0.0
         return file
@@ -352,3 +355,9 @@ class MHSBinaryFile:
                 cp = d[13 + 60 + j]
                 v_conv_precip[i, j] = cp
             n_extracted += 1
+
+
+
+
+path = "/home/simonpf/Dendrite/UserAreas/Teo/MHS/1409/MHS.CSU.20140902.002900.dat"
+mhs_data = MHSBinaryFile(path)

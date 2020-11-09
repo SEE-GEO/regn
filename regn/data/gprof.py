@@ -1,120 +1,96 @@
-import numpy as np
+"""
+regn.data.grof
+==============
+
+"""
+from abc import ABC, abstractmethod
 import glob
 import os
+
+import numpy as np
 import netCDF4
 import torch
 from torch.utils.data import Dataset
 import xarray
 
-################################################################################
+
+###############################################################################
 # Torch dataloader interface
-################################################################################
-
-class GprofData(Dataset):
+###############################################################################
+class Normalizer:
     """
-    Pytorch dataset for the Gprof training data.
+    The normalizer object keeps track of means and standard deviations to
+    use to normalize a dataset.
+    """
+    @staticmethod
+    def load(filename):
+        data = xarray.open_dataset(filename)
+        x_mean = data["x_mean"]
+        x_sigma = data["x_sigma"]
+        return Normalizer(x_mean, x_sigma)
 
-    This class is a wrapper around the netCDF4 files that are used to store
-    the GProf training data. It provides as input vector the brightness
-    temperatures and as output vector the surface precipitation.
+    def __init__(self, x_mean, x_sigma):
+        """
+        Create normalizer with given mean and standard deviation vectors.
 
+        Args:
+            x_mean(``np.array``): Array containing the mean values for all
+                input features.
+            x_sigma(``np.array``): Array containing the standard deviation values
+                for all input features.
+        """
+        self.x_mean = x_mean.reshape(1, -1)
+        self.x_sigma = x_sigma.reshape(1, -1)
+
+    def __call__(self, x):
+        """
+        Linearly transforms the inputs in x to have zero mean and unit
+        standard deviation.
+
+        Args:
+            Array of shape ``(m, n)`` with samples along first dimension and
+            input features along second dimension.
+
+        Return:
+            The given inputs in ``x`` normalized by the mean and standard
+            deviation stored in the normalizer.
+        """
+        x_normed = (x - self.x_mean) / self.x_sigma
+        return x_normed
+
+    def save(self, filename):
+        file = netCDF4.Dataset(filename, "w")
+        file.createVariable("x_mean", "f4", dimensions=())
+        file["x_mean"] = self.x_mean
+        file.createVariable("x_sigma", "f4", dimensions=())
+        file["x_sigma"] = self.x_sigma
+        file.close()
+
+
+
+class GPROFDataset(ABC):
+    """
+    Base class for datasets base on GPROF databses.
     """
     def __init__(self,
                  path,
-                 batch_size = None,
-                 surface_type = -1,
-                 normalization_data=None,
+                 batch_size=None,
+                 normalizer=Normalizer,
                  log_rain_rates=False,
                  rain_threshold=None):
-        """
-        Create instance of the dataset from a given file path.
-
-        Args:
-            path: Path to the NetCDF4 containing the data.
-            batch_size: If positive, data is provided in batches of this size
-            surface_type: If positive, only samples of the given surface type
-                are provided. Otherwise the surface type index is provided as
-                input features.
-            normalization_data: Filename of normalization data to use to
-                normalize inputs.
-            log_rain_rates: Boolean indicating whether or not to transform output
-                to log space.
-            rain_threshold: If provided, the given value is applied to the
-                output rain rates to turn them into binary non-raining / raining
-                labels.
-        """
-        super().__init__()
+        self.x = None
+        self.y = None
         self.batch_size = batch_size
+        self._load_data(path)
 
-        self.file = netCDF4.Dataset(path, mode = "r")
-
-        if not normalization_data is None:
-            self.normalization_data = xarray.open_dataset(normalization_data)
-
-        tcwv = self.file.variables["tcwv"][:]
-        surface_type_data = self.file.variables["surface_type"][:]
-        t2m = self.file.variables["t2m"][:]
-        bt = self.file.variables["brightness_temperature"][:]
-
-        if not normalization_data is None:
-            bt_mean = self.normalization_data["bt_mean"]
-            bt_std = self.normalization_data["bt_std"]
+        if not normalizer:
+            self.normalizer = self._get_normalizer()
+        elif isinstance(normalizer, Normalizer):
+            self.normalizer = normalizer
         else:
-            bt_mean = bt.mean(keepdims=True)
-            bt_std = bt.std(keepdims=True)
+            self.normalizer = Normalizer.load(normalizer)
 
-        valid = surface_type_data > 0
-        valid *= t2m > 0
-        valid *= tcwv > 0
-        if surface_type > 0:
-            valid *= surface_type_data == surface_type
-
-        inds = np.random.permutation(np.where(valid)[0])
-
-        tcwv = tcwv[inds].reshape(-1, 1)
-        if not normalization_data is None:
-            tcwv_mean = self.normalization_data["tcwv_mean"]
-            tcwv_std = self.normalization_data["tcwv_std"]
-        else:
-            tcwv_mean = tcwv.mean(keepdims=True)
-            tcwv_std = tcwv.std(keepdims=True)
-        tcwv = (tcwv - tcwv_mean) / tcwv_std
-
-        t2m = t2m[inds].reshape(-1, 1)
-        if not normalization_data is None:
-            t2m_mean = self.normalization_data["t2m_mean"]
-            t2m_std = self.normalization_data["t2m_std"]
-        else:
-            t2m_mean = t2m.mean(keepdims=True)
-            t2m_std = t2m.std(keepdims=True)
-        t2m = (t2m - t2m_mean) / t2m_std
-
-        surface_type_data = surface_type_data[inds].reshape(-1, 1)
-        surface_type_min = 1
-        surface_type_max = 14
-        n_classes = int(surface_type_max - surface_type_min)
-        surface_type_1h = np.zeros((surface_type_data.size, n_classes), dtype=np.float32)
-        indices = (surface_type_data - surface_type_min).astype(int)
-        surface_type_1h[indices] = 1.0
-
-        bt = bt[inds]
-        bt = (bt - bt.mean(keepdims=True)) / bt.std(keepdims=True)
-
-        if surface_type < 0:
-            self.x = np.concatenate([bt, t2m, tcwv, surface_type_1h], axis=1)
-        else:
-            self.x = np.concatenate([bt, t2m, tcwv], axis=1)
-        self.x = self.x.data
-        self.y = self.file.variables["surface_precipitation"][inds]
-        self.y = self.y.data
-        self.input_features = self.x.shape[1]
-
-        self.normalization_data = xarray.Dataset({"bt_mean" : (("samples", "channels"), bt_mean),
-                                                  "bt_std"  : (("samples", "channels"), bt_std),
-                                                  "tcwv_mean" : (("samples", "tcwv"), tcwv_mean),
-                                                  "tcwv_std"  : (("samples", "tcwv"), tcwv_std),
-                                                  "t2m_mean"  : (("samples", "t2m"), t2m_mean),
-                                                  "t2m_std"   : (("samples", "t2m"), t2m_std)})
+        self.x = self.normalizer(self.x)
 
         if log_rain_rates:
             self.transform_log()
@@ -122,6 +98,22 @@ class GprofData(Dataset):
         if rain_threshold:
             self.y = (self.y > rain_threshold).astype(np.float32)
 
+    @abstractmethod
+    def _get_normalizer(self):
+        """
+        Return normalizer object for data of this dataset instance.
+        """
+
+    @abstractmethod
+    def _load_data(self, path):
+        """
+        Load data from file into x and y attributes of the class
+        instance.
+
+        Args:
+            path(``str`` or ``pathlib.Path``): Path to netCDF file containing
+                the data to load.
+        """
 
     def __len__(self):
         """
@@ -184,6 +176,203 @@ class GprofData(Dataset):
                 data.
         """
         self.normalization_data.to_netcdf(filename)
+
+
+class GMIDataset(GPROFDataset):
+    """
+    Pytorch dataset interface for the Gprof training data for the GMI sensor.
+
+    This class is a wrapper around the netCDF4 files that are used to store
+    the GProf training data. It provides as input vector the brightness
+    temperatures and as output vector the surface precipitation.
+
+    """
+    def __init__(self,
+                 path,
+                 batch_size=None,
+                 surface_type=-1,
+                 normalizer=None,
+                 log_rain_rates=False,
+                 rain_threshold=None):
+        """
+        Create instance of the dataset from a given file path.
+
+        Args:
+            path: Path to the NetCDF4 containing the data.
+            batch_size: If positive, data is provided in batches of this size
+            surface_type: If positive, only samples of the given surface type
+                are provided. Otherwise the surface type index is provided as
+                input features.
+            normalization_data: Filename of normalization data to use to
+                normalize inputs.
+            log_rain_rates: Boolean indicating whether or not to transform output
+                to log space.
+            rain_threshold: If provided, the given value is applied to the
+                output rain rates to turn them into binary non-raining / raining
+                labels.
+        """
+        self.surface_type = surface_type
+        super().__init__(path,
+                         batch_size,
+                         normalizer,
+                         log_rain_rates,
+                         rain_threshold)
+
+    def _get_normalizer(self):
+        x_mean = np.mean(self.x, axis=0, keepdims=True)
+        x_sigma = np.std(self.x, axis=0, keepdims=True)
+        if self.surface_type < 0:
+            x_mean[0, 15:] = 0.0
+            x_sigma[0, 15:] = 1.0
+        return Normalizer(x_mean, x_sigma)
+
+    def _load_data(self, path):
+        self.file = netCDF4.Dataset(path, mode = "r")
+
+        tcwv = self.file.variables["tcwv"][:]
+        surface_type_data = self.file.variables["surface_type"][:]
+        t2m = self.file.variables["t2m"][:]
+        bt = self.file.variables["brightness_temperature"][:]
+
+        valid = surface_type_data > 0
+        valid *= t2m > 0
+        valid *= tcwv > 0
+        if self.surface_type > 0:
+            valid *= surface_type_data == self.surface_type
+
+        inds = np.arange(np.sum(valid))
+
+        tcwv = tcwv[inds].reshape(-1, 1)
+        t2m = t2m[inds].reshape(-1, 1)
+
+        print("loading 1")
+
+        surface_type_data = surface_type_data[inds].reshape(-1, 1)
+        surface_type_min = 1
+        surface_type_max = 15
+        n_classes = int(surface_type_max - surface_type_min)
+        surface_type_1h = np.zeros((surface_type_data.size, n_classes), dtype=np.float32)
+        indices = (surface_type_data - surface_type_min).astype(int)
+        surface_type_1h[np.arange(surface_type_1h.shape[0]),
+                        indices.ravel()] = 1.0
+        bt = bt[inds]
+
+        print("loading 2")
+        self.n_obs = bt.shape[-1]
+        self.n_surface_classes = n_classes
+        if self.surface_type < 0:
+            self.x = np.concatenate([bt, t2m, tcwv, surface_type_1h], axis=1)
+        else:
+            self.x = np.concatenate([bt, t2m, tcwv], axis=1)
+        self.x = self.x.data
+        self.y = self.file.variables["surface_precipitation"][inds]
+        self.y = self.y.data.reshape(-1, 1)
+        self.input_features = self.x.shape[1]
+
+class MHSData(GPROFDataset):
+    """
+    Pytorch dataset for the Gprof training data.
+
+    This class is a wrapper around the netCDF4 files that are used to store
+    the GProf training data. It provides as input vector the brightness
+    temperatures and as output vector the surface precipitation.
+
+    """
+    def __init__(self,
+                 path,
+                 batch_size=None,
+                 surface_type=-1,
+                 normalizer=None,
+                 log_rain_rates=False,
+                 rain_threshold=None):
+        self.surface_type = surface_type
+        """
+        Create instance of the dataset from a given file path.
+
+        Args:
+            path: Path to the NetCDF4 containing the data.
+            batch_size: If positive, data is provided in batches of this size
+            surface_type: If positive, only samples of the given surface type
+                are provided. Otherwise the surface type index is provided as
+                input features.
+            normalization_data: Filename of normalization data to use to
+                normalize inputs.
+            log_rain_rates: Boolean indicating whether or not to transform output
+                to log space.
+            rain_threshold: If provided, the given value is applied to the
+                output rain rates to turn them into binary non-raining / raining
+                labels.
+        """
+        super().__init__(path,
+                         batch_size,
+                         normalizer,
+                         log_rain_rates,
+                         rain_threshold)
+
+    def _get_normalizer(self):
+        x_mean = np.mean(self.x, axis=0, keepdims=True)
+        x_sigma = np.std(self.x, axis=0, keepdims=True)
+        if self.surface_type < 0:
+            x_mean[0, 7:-1] = 0.0
+            x_sigma[0, 7:-1] = 1.0
+        return Normalizer(x_mean, x_sigma)
+
+    def _load_data(self, path):
+        self.file = netCDF4.Dataset(path, mode = "r")
+
+        tcwv = self.file.variables["tcwv"][:]
+        surface_type_data = self.file.variables["surface_type"][:]
+        t2m = self.file.variables["t2m"][:]
+        bt = self.file.variables["brightness_temperature"][:]
+
+        valid = surface_type_data > 0
+        valid *= t2m > 0
+        valid *= tcwv > 0
+        if self.surface_type > 0:
+            valid *= surface_type_data == surface_type
+
+        inds = np.arange(np.sum(valid))
+
+        tcwv = tcwv[inds].reshape(-1, 1, 1)
+        t2m = t2m[inds].reshape(-1, 1, 1)
+
+        surface_type_data = surface_type_data[inds].reshape(-1, 1)
+        surface_type_min = 1
+        surface_type_max = 15
+        n_classes = int(surface_type_max - surface_type_min)
+        surface_type_1h = np.zeros((surface_type_data.size, n_classes), dtype=np.float32)
+        indices = (surface_type_data - surface_type_min).astype(int)
+        surface_type_1h[np.arange(surface_type_1h.shape[0]),
+                        indices.ravel()] = 1.0
+        surface_type_1h = surface_type_1h.reshape(-1, 1, n_classes)
+
+        viewing_angles = self.file.variables["viewing_angles"][:]
+        viewing_angles = viewing_angles.reshape(1, -1, 1)
+        self.n_obs = bt.shape[-1]
+        self.n_surface_classes = n_classes
+        bt = bt[inds]
+
+        tcwv = np.broadcast_to(tcwv, bt.shape[:2] + (1,))
+        tcwv = tcwv.reshape(-1, tcwv.shape[-1])
+        t2m = np.broadcast_to(t2m, bt.shape[:2] + (1,))
+        t2m = t2m.reshape(-1, t2m.shape[-1])
+        surface_type_1h = np.broadcast_to(surface_type_1h, bt.shape[:2] + (n_classes,))
+        surface_type_1h = surface_type_1h.reshape(-1, surface_type_1h.shape[-1])
+        viewing_angles = np.broadcast_to(viewing_angles, (bt.shape[:2] + (1,)))
+        viewing_angles = viewing_angles.reshape(-1, viewing_angles.shape[-1])
+
+        bt = bt.reshape(-1, bt.shape[-1])
+
+        if self.surface_type < 0:
+            self.x = np.concatenate([bt, t2m, tcwv, surface_type_1h, viewing_angles], axis=1)
+        else:
+            self.x = np.concatenate([bt, t2m, tcwv, viewing_angles], axis=1)
+        self.x = self.x.data
+
+        self.y = self.file.variables["surface_precipitation"][inds]
+        self.y = self.y.data.reshape(-1, 1)
+
+        self.input_features = self.x.shape[1]
 
 ################################################################################
 # Interface to binary data.
