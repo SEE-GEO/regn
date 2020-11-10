@@ -55,8 +55,10 @@ class Normalizer:
             The given inputs in ``x`` normalized by the mean and standard
             deviation stored in the normalizer.
         """
-        x_normed = (x - self.x_mean) / self.x_sigma
-        return x_normed
+        x_normed = (x.astype(np.float64) - self.x_mean) / self.x_sigma
+        print(x_normed.mean(axis=0))
+        print(x_normed.std(axis=0))
+        return x_normed.astype(np.float32)
 
     def save(self, filename):
         file = netCDF4.Dataset(filename, "w")
@@ -150,7 +152,7 @@ class GPROFDataset(ABC):
             if i >= len(self):
                 raise IndexError()
             return (torch.tensor(self.x[i_start : i_end, :]),
-                    torch.tensor(self.y[i_start : i_end]))
+                    torch.tensor(self.y[i_start : i_end].ravel()))
 
     def transform_log(self):
         """
@@ -193,7 +195,8 @@ class GMIDataset(GPROFDataset):
                  surface_type=-1,
                  normalizer=None,
                  log_rain_rates=False,
-                 rain_threshold=None):
+                 rain_threshold=None,
+                 normalize=True):
         """
         Create instance of the dataset from a given file path.
 
@@ -211,6 +214,7 @@ class GMIDataset(GPROFDataset):
                 output rain rates to turn them into binary non-raining / raining
                 labels.
         """
+        self.normalize = normalize
         self.surface_type = surface_type
         super().__init__(path,
                          batch_size,
@@ -219,12 +223,15 @@ class GMIDataset(GPROFDataset):
                          rain_threshold)
 
     def _get_normalizer(self):
-        x_mean = np.mean(self.x, axis=0, keepdims=True)
-        x_sigma = np.std(self.x, axis=0, keepdims=True)
-        if self.surface_type < 0:
-            x_mean[0, 15:] = 0.0
-            x_sigma[0, 15:] = 1.0
-        return Normalizer(x_mean, x_sigma)
+        if self.normalize:
+            x = self.x.astype(np.float64)
+            x_mean = np.mean(x, keepdims=True)
+            x_sigma = np.std(x, axis=0, keepdims=True)
+            if self.surface_type < 0:
+                x_mean[0, 15:] = 0.0
+                x_sigma[0, 15:] = 1.0
+            return Normalizer(x_mean, x_sigma)
+        return Normalizer(0.0, 1.0)
 
     def _load_data(self, path):
         self.file = netCDF4.Dataset(path, mode = "r")
@@ -269,7 +276,7 @@ class GMIDataset(GPROFDataset):
         self.y = self.y.data.reshape(-1, 1)
         self.input_features = self.x.shape[1]
 
-class MHSData(GPROFDataset):
+class MHSDataset(GPROFDataset):
     """
     Pytorch dataset for the Gprof training data.
 
@@ -284,7 +291,9 @@ class MHSData(GPROFDataset):
                  surface_type=-1,
                  normalizer=None,
                  log_rain_rates=False,
-                 rain_threshold=None):
+                 rain_threshold=None,
+                 normalize=True):
+        self.normalize = normalize
         self.surface_type = surface_type
         """
         Create instance of the dataset from a given file path.
@@ -310,12 +319,15 @@ class MHSData(GPROFDataset):
                          rain_threshold)
 
     def _get_normalizer(self):
-        x_mean = np.mean(self.x, axis=0, keepdims=True)
-        x_sigma = np.std(self.x, axis=0, keepdims=True)
-        if self.surface_type < 0:
-            x_mean[0, 7:-1] = 0.0
-            x_sigma[0, 7:-1] = 1.0
-        return Normalizer(x_mean, x_sigma)
+        if self.normalize:
+            x = self.x.astype(np.float64)
+            x_mean = np.mean(x, axis=0, keepdims=True)
+            x_sigma = np.std(x, axis=0, keepdims=True)
+            if self.surface_type < 0:
+                x_mean[0, 7:-1] = 0.0
+                x_sigma[0, 7:-1] = 1.0
+            return Normalizer(x_mean, x_sigma)
+        return Normalizer(np.array([0.0]), np.array([1.0]))
 
     def _load_data(self, path):
         self.file = netCDF4.Dataset(path, mode = "r")

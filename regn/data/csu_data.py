@@ -60,8 +60,8 @@ PIXEL_TYPES_GMI = [('nx', 'i4'),
                    ('lat', 'f4'),
                    ('lon', 'f4'),
                    ('sfccode', 'i4'),
-                   ('tcwv', 'i4'),
-                   ('T2m', 'i4')]
+                   ('tcwv', 'f4'),
+                   ('T2m', 'f4')]
 PIXEL_TYPES_GMI += [(f'Tb_{i}', 'f4') for i in range(13)]
 PIXEL_TYPES_GMI += [(f'sfcprcp', 'f4'),
                     (f'cnvprcp', 'f4')]
@@ -144,7 +144,7 @@ class GMIBinaryFile:
         v_tcwv = file.variables["tcwv"]
         v_t2m = file.variables["t2m"]
         v_surf_precip = file.variables["surface_precipitation"]
-        v_conv_precip = file.variables["surface_precipitation"]
+        v_conv_precip = file.variables["convective_precipitation"]
         v_tbs_min = file.variables["tbs_min"]
         v_tbs_max = file.variables["tbs_max"]
 
@@ -212,8 +212,8 @@ PIXEL_TYPES_MHS = [('nx', 'i4'),
                    ('lat', 'f4'),
                    ('lon', 'f4'),
                    ('sfccode', 'i4'),
-                   ('tcwv', 'i4'),
-                   ('T2m', 'i4')]
+                   ('tcwv', 'f4'),
+                   ('T2m', 'f4')]
 PIXEL_TYPES_MHS += [(f'Tb_{i}_{j}', 'f4') for i in range(10) for j in range(5)]
 PIXEL_TYPES_MHS += [(f'sfcprcp_{i}', 'f4') for i in range(10)]
 PIXEL_TYPES_MHS += [(f'cnvprcp_{i}', 'f4') for i in range(10)]
