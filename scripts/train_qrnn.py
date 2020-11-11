@@ -79,7 +79,7 @@ losses = qrnn.train(training_data=training_data,
                     initial_learning_rate=1.0,
                     convergence_epochs=2,
                     delta_at=1e-3,
-                    maximum_epochs=50,
+                    maximum_epochs=100,
 gpu=True)
 
 #

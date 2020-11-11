@@ -152,7 +152,7 @@ class GPROFDataset(ABC):
             if i >= len(self):
                 raise IndexError()
             return (torch.tensor(self.x[i_start : i_end, :]),
-                    torch.tensor(self.y[i_start : i_end].ravel()))
+                    torch.tensor(self.y[i_start : i_end]))
 
     def transform_log(self):
         """
@@ -225,7 +225,7 @@ class GMIDataset(GPROFDataset):
     def _get_normalizer(self):
         if self.normalize:
             x = self.x.astype(np.float64)
-            x_mean = np.mean(x, keepdims=True)
+            x_mean = np.mean(x, axis=0, keepdims=True)
             x_sigma = np.std(x, axis=0, keepdims=True)
             if self.surface_type < 0:
                 x_mean[0, 15:] = 0.0
@@ -341,7 +341,7 @@ class MHSDataset(GPROFDataset):
         valid *= t2m > 0
         valid *= tcwv > 0
         if self.surface_type > 0:
-            valid *= surface_type_data == surface_type
+            valid *= surface_type_data == self.surface_type
 
         inds = np.arange(np.sum(valid))
 
