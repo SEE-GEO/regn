@@ -54,10 +54,10 @@ data_classes = {"gmi": GMIDataset,
 
 data_class = data_classes[sensor]
 training_data = data_class(training_data,
-                        batch_size=128)
+                        batch_size=512)
 validation_data = data_class(validation_data,
                           normalizer=training_data.normalizer,
-                          batch_size=128)
+                          batch_size=512)
 training_data = DataLoader(training_data, batch_size=None, num_workers=4, pin_memory=True)
 validation_data = DataLoader(validation_data, batch_size=None, num_workers=4, pin_memory=True)
 
@@ -94,32 +94,33 @@ qrnn.train(training_data=training_data,
            initial_learning_rate=0.1,
            convergence_epochs=0,
            delta_at=1e-3,
-           maximum_epochs=5,
+           maximum_epochs=10,
            optimizer=optimizer,
            learning_rate_scheduler=scheduler,
            gpu=True)
 optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 10)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
 qrnn.train(training_data=training_data,
-           validation_data=validation_data,
-           initial_learning_rate=0.1,
-           convergence_epochs=0,
-           delta_at=1e-3,
-           maximum_epochs=5,
+           maximum_epochs=20,
            optimizer=optimizer,
            learning_rate_scheduler=scheduler,
            gpu=True)
 optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
+losses = qrnn.train(training_data=training_data,
+	    	    maximum_epochs=20,
+                    validation_data=validation_data,
+		    optimizer=optimizer,
+		    learning_rate_scheduler=scheduler,
+		    gpu=True)
+optimizer = optim.SGD(model.parameters(), lr=0.0001)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 10)
 losses = qrnn.train(training_data=training_data,
+                    maximum_epochs=10,
                     validation_data=validation_data,
-                    initial_learning_rate=0.1,
-                    convergence_epochs=0,
-                    delta_at=1e-3,
-                    maximum_epochs=5,
-                    optimizer=optimizer,
-                    learning_rate_scheduler=scheduler,
-                    gpu=True)
+		    optimizer=optimizer,
+		    learning_rate_scheduler=scheduler,
+		    gpu=True)
 
 
 #
