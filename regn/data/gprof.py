@@ -12,6 +12,7 @@ import netCDF4
 import torch
 from torch.utils.data import Dataset
 import xarray
+import pandas as pd
 
 
 ###############################################################################
@@ -90,9 +91,11 @@ class GPROFDataset(ABC):
                  batch_size=None,
                  normalizer=Normalizer,
                  log_rain_rates=False,
-                 rain_threshold=None):
+                 rain_threshold=None,
+                 shuffle=True):
         self.x = None
         self.y = None
+        self.shuffle = shuffle
         self.batch_size = batch_size
         self._load_data(path)
 
@@ -148,7 +151,7 @@ class GPROFDataset(ABC):
         Args:
             i(int): The index of the sample to return
         """
-        if i == 0:
+        if self.shuffle and i == 0:
             indices = np.random.permutation(self.x.shape[0])
             self.x = self.x[indices, :]
             self.y = self.y[indices]
@@ -240,7 +243,7 @@ class GMIDataset(GPROFDataset):
             x_mean = np.mean(x, axis=0, keepdims=True)
             x_sigma = np.std(x, axis=0, keepdims=True)
             if self.surface_type < 0:
-                x_mean[0, 15:] = -0.5
+                x_mean[0, 15:] = 0.5
                 x_sigma[0, 15:] = 1.0
             return Normalizer(x_mean, x_sigma)
         return Normalizer(0.0, 1.0)
@@ -412,9 +415,37 @@ class MHSDataset(GPROFDataset):
         self.input_features = self.x.shape[1]
 
     def evaluate(self, model):
-        pass
 
+        if self.batch_size:
+            batch_size = self.batch_size
+        else:
+            batch_size = 1
 
+        i_start = 0
+        n_samples = self.x.shape[0]
+        viewing_angle_mean = self.normalizer.x_mean[0, -1]
+        viewing_angle_std = self.normalizer.x_sigma[0, -1]
+
+        columns = ["y_true", "surface_type", "viewing_angle"]
+        columns += [rf"$y (tau = {t})" for t in model.quantiles]
+        results = pd.DataFrame(columns=columns)
+
+        while i_start < n_samples:
+            x = self.x[i_start:i_start + batch_size, :]
+            y = self.y[i_start:i_start + batch_size, :]
+            y_pred = model.predict(x)
+            surface_type = np.where(x[:, 7:-1] - 0.5)[1]
+            viewing_angles = x[:, -1] * viewing_angle_std + viewing_angle_mean
+            viewing_angles = np.round(viewing_angles, decimals=2)
+
+            results_tmp = np.concatenate([y,
+                                          surface_type.reshape(-1, 1),
+                                          viewing_angles.reshape(-1, 1),
+                                          y_pred],
+                                         axis=-1)
+            results = results.append(pd.DataFrame(results_tmp, columns=columns))
+            i_start += batch_size
+        return results
 
 
 ###############################################################################
