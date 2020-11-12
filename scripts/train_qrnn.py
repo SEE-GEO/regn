@@ -39,8 +39,8 @@ model_path.mkdir(parents=False, exist_ok=True)
 n_layers = args.n_layers[0]
 n_neurons = args.n_neurons[0]
 
-network_name = f"qrnn_{n_layers}_{n_neurons}_relu_bn.pt"
-results_name = f"qrnn_{n_layers}_{n_neurons}_relu_bn.dat"
+network_name = f"qrnn_{sensor}_{n_layers}_{n_neurons}_relu_bn.pt"
+results_name = f"qrnn_{sensor}_{n_layers}_{n_neurons}_relu_bn.dat"
 
 #
 # Load the data.
@@ -51,10 +51,10 @@ data_classes = {"gmi": GMIDataset,
 
 data_class = data_classes[sensor]
 training_data = data_class(training_data,
-                        batch_size=512)
+                        batch_size=128)
 validation_data = data_class(validation_data,
                           normalizer=training_data.normalizer,
-                          batch_size=512)
+                          batch_size=128)
 training_data = DataLoader(training_data, batch_size=None, num_workers=4, pin_memory=True)
 validation_data = DataLoader(validation_data, batch_size=None, num_workers=4, pin_memory=True)
 
@@ -68,19 +68,19 @@ model = FullyConnected(training_data.dataset.input_features,
                        quantiles,
                        n_layers,
                        n_neurons,
-                       batch_norm=True,
+                       batch_norm=False,
                        skip_connections=False)
 model.quantiles = quantiles
 model.backend = "typhon.retrieval.qrnn.models.pytorch"
-qrnn = QRNN(20, model=model)
+qrnn = QRNN(training_data.dataset.input_features, model=model)
 
 losses = qrnn.train(training_data=training_data,
                     validation_data=validation_data,
                     initial_learning_rate=1.0,
-                    convergence_epochs=2,
+                    convergence_epochs=5,
                     delta_at=1e-3,
-                    maximum_epochs=50,
-gpu=True)
+                    maximum_epochs=20,
+                    gpu=True)
 
 #
 # Store results
@@ -89,4 +89,4 @@ gpu=True)
 qrnn.save(model_path / network_name)
 training_errors = losses["training_errors"]
 validation_errors = losses["validation_errors"]
-np.savetxt(losses_name, np.stack((training_errors, validation_errors)))
+np.savetxt(results_name, np.stack((training_errors, validation_errors)))
