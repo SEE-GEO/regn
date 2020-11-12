@@ -426,14 +426,18 @@ class MHSDataset(GPROFDataset):
         viewing_angle_mean = self.normalizer.x_mean[0, -1]
         viewing_angle_std = self.normalizer.x_sigma[0, -1]
 
-        columns = ["y_true", "surface_type", "viewing_angle"]
-        columns += [rf"$y (tau = {t})" for t in model.quantiles]
+        columns = ["y_true",
+                   "surface_type",
+                   "viewing_angle",
+                   "y_mean"]
+        columns += [rf"y({t})" for t in model.quantiles]
         results = pd.DataFrame(columns=columns)
 
         while i_start < n_samples:
             x = self.x[i_start:i_start + batch_size, :]
             y = self.y[i_start:i_start + batch_size, :]
             y_pred = model.predict(x)
+            y_mean = model.posterior_mean(x)
             surface_type = np.where(x[:, 7:-1] - 0.5)[1]
             viewing_angles = x[:, -1] * viewing_angle_std + viewing_angle_mean
             viewing_angles = np.round(viewing_angles, decimals=2)
@@ -441,6 +445,7 @@ class MHSDataset(GPROFDataset):
             results_tmp = np.concatenate([y,
                                           surface_type.reshape(-1, 1),
                                           viewing_angles.reshape(-1, 1),
+                                          y_mean.reshape(-1, 1),
                                           y_pred],
                                          axis=-1)
             results = results.append(pd.DataFrame(results_tmp, columns=columns))
