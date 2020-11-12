@@ -326,7 +326,7 @@ class MHSDataset(GPROFDataset):
             #if self.surface_type < 0:
             #    x_mean[0, 7:-1] = 0.0
             #    x_sigma[0, 7:-1] = 1.0
-            #return Normalizer(x_mean, x_sigma)
+            return Normalizer(x_mean, x_sigma)
         return Normalizer(np.array([0.0]), np.array([1.0]))
 
     def _load_data(self, path):
