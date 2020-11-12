@@ -4,9 +4,9 @@ regn.data.grof
 
 """
 from abc import ABC, abstractmethod
-import glob
-import os
 
+import matplotlib as plt
+from matplotlib.gridspec import GridSpec
 import numpy as np
 import netCDF4
 import torch
@@ -15,7 +15,7 @@ import xarray
 
 
 ###############################################################################
-# Torch dataloader interface
+# Input-data normalizer.
 ###############################################################################
 class Normalizer:
     """
@@ -24,6 +24,16 @@ class Normalizer:
     """
     @staticmethod
     def load(filename):
+        """
+        Load normalizer from file.
+
+        Args:
+            filename: Path of netCDF4 file containing the normalization data.
+
+        Returns:
+            Normalizer object initialized with the normalization data stored
+            in the given file.
+        """
         data = xarray.open_dataset(filename)
         x_mean = data["x_mean"]
         x_sigma = data["x_sigma"]
@@ -36,31 +46,30 @@ class Normalizer:
         Args:
             x_mean(``np.array``): Array containing the mean values for all
                 input features.
-            x_sigma(``np.array``): Array containing the standard deviation values
-                for all input features.
+            x_sigma(``np.array``): Array containing the standard deviation
+                values for all input features.
         """
         self.x_mean = x_mean.reshape(1, -1)
         self.x_sigma = x_sigma.reshape(1, -1)
 
-    def __call__(self, x):
+    def __call__(self, input_data):
         """
         Linearly transforms the inputs in x to have zero mean and unit
         standard deviation.
 
         Args:
-            Array of shape ``(m, n)`` with samples along first dimension and
-            input features along second dimension.
+            input_data: Array of shape ``(m, n)`` with samples along first
+            dimension and input features along second dimension.
 
         Return:
             The given inputs in ``x`` normalized by the mean and standard
             deviation stored in the normalizer.
         """
-        x_normed = (x.astype(np.float64) - self.x_mean) / self.x_sigma
-        print(x_normed.mean(axis=0))
-        print(x_normed.std(axis=0))
+        x_normed = (input_data.astype(np.float64) - self.x_mean) / self.x_sigma
         return x_normed.astype(np.float32)
 
     def save(self, filename):
+        """ Store normalization data to file. """
         file = netCDF4.Dataset(filename, "w")
         file.createVariable("x_mean", "f4", dimensions=())
         file["x_mean"] = self.x_mean
@@ -69,7 +78,9 @@ class Normalizer:
         file.close()
 
 
-
+###############################################################################
+# Base class for GPROF datasets.
+###############################################################################
 class GPROFDataset(ABC):
     """
     Base class for datasets base on GPROF databses.
@@ -127,8 +138,7 @@ class GPROFDataset(ABC):
         """
         if self.batch_size is None:
             return self.x.shape[0]
-        else:
-            return self.x.shape[0] // self.batch_size
+        return self.x.shape[0] // self.batch_size
 
     def __getitem__(self, i):
         """
@@ -138,7 +148,7 @@ class GPROFDataset(ABC):
         Args:
             i(int): The index of the sample to return
         """
-        if (i == 0):
+        if i == 0:
             indices = np.random.permutation(self.x.shape[0])
             self.x = self.x[indices, :]
             self.y = self.y[indices]
@@ -146,13 +156,13 @@ class GPROFDataset(ABC):
         if self.batch_size is None:
             return (torch.tensor(self.x[[i], :]),
                     torch.tensor(self.y[[i]]))
-        else:
-            i_start = self.batch_size * i
-            i_end = self.batch_size * (i + 1)
-            if i >= len(self):
-                raise IndexError()
-            return (torch.tensor(self.x[i_start : i_end, :]),
-                    torch.tensor(self.y[i_start : i_end]))
+
+        i_start = self.batch_size * i
+        i_end = self.batch_size * (i + 1)
+        if i >= len(self):
+            raise IndexError()
+        return (torch.tensor(self.x[i_start:i_end, :]),
+                torch.tensor(self.y[i_start:i_end]))
 
     def transform_log(self):
         """
@@ -167,7 +177,6 @@ class GPROFDataset(ABC):
         y = np.log10(y)
         self.y = y
 
-
     def store_normalization_data(self, filename):
         """
         Store means and standard deviations used to normalize input data in
@@ -180,6 +189,9 @@ class GPROFDataset(ABC):
         self.normalization_data.to_netcdf(filename)
 
 
+###############################################################################
+# GMI data
+###############################################################################
 class GMIDataset(GPROFDataset):
     """
     Pytorch dataset interface for the Gprof training data for the GMI sensor.
@@ -208,11 +220,11 @@ class GMIDataset(GPROFDataset):
                 input features.
             normalization_data: Filename of normalization data to use to
                 normalize inputs.
-            log_rain_rates: Boolean indicating whether or not to transform output
-                to log space.
+            log_rain_rates: Boolean indicating whether or not to transform
+                output to log space.
             rain_threshold: If provided, the given value is applied to the
-                output rain rates to turn them into binary non-raining / raining
-                labels.
+                output rain rates to turn them into binary non-raining /
+                raining labels.
         """
         self.normalize = normalize
         self.surface_type = surface_type
@@ -228,13 +240,13 @@ class GMIDataset(GPROFDataset):
             x_mean = np.mean(x, axis=0, keepdims=True)
             x_sigma = np.std(x, axis=0, keepdims=True)
             if self.surface_type < 0:
-                x_mean[0, 15:-1] = -0.5
-                x_sigma[0, 15:-1] = 1.0
+                x_mean[0, 15:] = -0.5
+                x_sigma[0, 15:] = 1.0
             return Normalizer(x_mean, x_sigma)
         return Normalizer(0.0, 1.0)
 
     def _load_data(self, path):
-        self.file = netCDF4.Dataset(path, mode = "r")
+        self.file = netCDF4.Dataset(path, mode="r")
 
         tcwv = self.file.variables["tcwv"][:]
         surface_type_data = self.file.variables["surface_type"][:]
@@ -258,7 +270,8 @@ class GMIDataset(GPROFDataset):
         surface_type_min = 1
         surface_type_max = 15
         n_classes = int(surface_type_max - surface_type_min)
-        surface_type_1h = np.zeros((surface_type_data.size, n_classes), dtype=np.float32)
+        surface_type_1h = np.zeros((surface_type_data.size, n_classes),
+                                   dtype=np.float32)
         indices = (surface_type_data - surface_type_min).astype(int)
         surface_type_1h[np.arange(surface_type_1h.shape[0]),
                         indices.ravel()] = 1.0
@@ -275,6 +288,11 @@ class GMIDataset(GPROFDataset):
         self.y = self.file.variables["surface_precipitation"][inds]
         self.y = self.y.data.reshape(-1, 1)
         self.input_features = self.x.shape[1]
+
+
+###############################################################################
+# MHS Dataset
+###############################################################################
 
 class MHSDataset(GPROFDataset):
     """
@@ -306,11 +324,11 @@ class MHSDataset(GPROFDataset):
                 input features.
             normalization_data: Filename of normalization data to use to
                 normalize inputs.
-            log_rain_rates: Boolean indicating whether or not to transform output
-                to log space.
+            log_rain_rates: Boolean indicating whether or not to transform
+                output to log space.
             rain_threshold: If provided, the given value is applied to the
-                output rain rates to turn them into binary non-raining / raining
-                labels.
+                output rain rates to turn them into binary non-raining /
+                raining labels.
         """
         super().__init__(path,
                          batch_size,
@@ -330,7 +348,7 @@ class MHSDataset(GPROFDataset):
         return Normalizer(np.array([0.0]), np.array([1.0]))
 
     def _load_data(self, path):
-        self.file = netCDF4.Dataset(path, mode = "r")
+        self.file = netCDF4.Dataset(path, mode="r")
 
         tcwv = self.file.variables["tcwv"][:]
         surface_type_data = self.file.variables["surface_type"][:]
@@ -342,6 +360,7 @@ class MHSDataset(GPROFDataset):
         valid *= tcwv > 0
         if self.surface_type > 0:
             valid *= surface_type_data == self.surface_type
+        self.valid_samples = valid
 
         inds = np.arange(np.sum(valid))
 
@@ -352,7 +371,8 @@ class MHSDataset(GPROFDataset):
         surface_type_min = 1
         surface_type_max = 15
         n_classes = int(surface_type_max - surface_type_min)
-        surface_type_1h = np.zeros((surface_type_data.size, n_classes), dtype=np.float32)
+        surface_type_1h = np.zeros((surface_type_data.size, n_classes),
+                                   dtype=np.float32)
         indices = (surface_type_data - surface_type_min).astype(int)
         surface_type_1h[np.arange(surface_type_1h.shape[0]),
                         indices.ravel()] = 1.0
@@ -368,15 +388,20 @@ class MHSDataset(GPROFDataset):
         tcwv = tcwv.reshape(-1, tcwv.shape[-1])
         t2m = np.broadcast_to(t2m, bt.shape[:2] + (1,))
         t2m = t2m.reshape(-1, t2m.shape[-1])
-        surface_type_1h = np.broadcast_to(surface_type_1h, bt.shape[:2] + (n_classes,))
-        surface_type_1h = surface_type_1h.reshape(-1, surface_type_1h.shape[-1])
-        viewing_angles = np.broadcast_to(viewing_angles, (bt.shape[:2] + (1,)))
+        surface_type_1h = np.broadcast_to(surface_type_1h,
+                                          bt.shape[:2] + (n_classes,))
+        surface_type_1h = surface_type_1h.reshape(-1,
+                                                  surface_type_1h.shape[-1])
+        viewing_angles = np.broadcast_to(viewing_angles,
+                                         (bt.shape[:2] + (1,)))
         viewing_angles = viewing_angles.reshape(-1, viewing_angles.shape[-1])
 
         bt = bt.reshape(-1, bt.shape[-1])
 
         if self.surface_type < 0:
-            self.x = np.concatenate([bt, t2m, tcwv, surface_type_1h, viewing_angles], axis=1)
+            self.x = np.concatenate(
+                [bt, t2m, tcwv, surface_type_1h, viewing_angles], axis=1
+            )
         else:
             self.x = np.concatenate([bt, t2m, tcwv, viewing_angles], axis=1)
         self.x = self.x.data
@@ -386,178 +411,18 @@ class MHSDataset(GPROFDataset):
 
         self.input_features = self.x.shape[1]
 
-################################################################################
-# Interface to binary data.
-################################################################################
+    def evaluate(self, model):
+        pass
 
-types =  [('nx', 'i4'), ('ny', 'i4')]
-types += [('year', 'i4'),
-          ('month', 'i4'),
-          ('day', 'i4'),
-          ('hour', 'i4'),
-          ('minute', 'i4'),
-          ('second', 'i4')]
-types +=  [('lat', 'f4'), ('lon', 'f4')]
-types += [('sfccode', 'i4'), ('tcwv', 'i4'), ('T2m', 'i4')]
-types += [('Tb_{}'.format(i), 'f4') for i in range(13)]
-types += [('sfcprcp', 'f4'), ('cnvprcp', 'f4')]
 
-def read_file(f):
-    """
-    Read GPM binary file.
 
-    Arguments:
-        f(str): Filename of file to read
 
-    Returns:
-        numpy memmap object pointing to the data.
-    """
-    data = np.memmap(f,
-                     dtype = types,
-                     mode =  "r",
-                     offset = 10 + 26 * 4)
-    return data
-
-def check_sample(data):
-    """
-    Check that brightness temperatures of a sample are within a valid range.
-
-    Arguments:
-        data: The data array containing the data of one training sample.
-
-    Return:
-        Bool indicating whether the given sample contains valid brightness
-        temperatures.
-    """
-    return all([data[i] > 0 and data[i] < 1000 for i in range(13, 26)])
-
-def write_to_file(file, data, samples = -1):
-    """
-    Write data to NetCDF file.
-
-    Arguments
-        file: File handle to the output file.
-        data: numpy memmap object pointing to the binary data
-    """
-    v_tbs = file.variables["brightness_temperature"]
-    v_lats = file.variables["latitude"]
-    v_lons = file.variables["longitude"]
-    v_sfccode = file.variables["surface_type"]
-    v_tcwv = file.variables["tcwv"]
-    v_t2m = file.variables["t2m"]
-    v_surf_precip = file.variables["surface_precipitation"]
-    v_tbs_min = file.variables["bt_min"]
-    v_tbs_max = file.variables["bt_max"]
-
-    v_year = file.variables["year"]
-    v_month = file.variables["month"]
-    v_day = file.variables["day"]
-    v_hour = file.variables["hour"]
-    v_minute = file.variables["minute"]
-    v_second = file.variables["second"]
-
-    i = file.dimensions["samples"].size
-
-    inds = np.random.permutation(np.arange(data.shape[0]))
-    j = 0
-    for _ in range(samples):
-        while j < data.shape[0] and not check_sample(data[inds[j]]):
-            j = j+1
-        if j >= data.shape[0]:
-            break
-        d = data[inds[j]]
-
-        v_year[i] = d[2]
-        v_month[i] = d[3]
-        v_day[i] = d[4]
-        v_hour[i] = d[5]
-        v_minute[i] = d[6]
-        v_second[i] = d[7]
-
-        v_lats[i] = d[8]
-        v_lons[i] = d[9]
-        v_sfccode[i] = d[10]
-        v_tcwv[i] = d[11]
-        v_t2m[i] = d[12]
-        for k in range(13):
-            v_tbs_min[k] = np.minimum(v_tbs_min[k], d[13 + k])
-            v_tbs_max[k] = np.maximum(v_tbs_max[k], d[13 + k])
-            v_tbs[i, k] = d[13 + k]
-        v_surf_precip[i] = d[26]
-        i += 1
-        j += 1
-
-def create_output_file(path):
-    """
-    Creates netCDF4 output file to store training data in.
-
-    Arguments:
-        path: Filename of the file to create.
-
-    Returns:
-        netCDF4 Dataset object pointing to the created file
-    """
-    file = netCDF4.Dataset(path, "w")
-    file.createDimension("channels", size = 13)
-    file.createDimension("samples", size = None) #unlimited dimensions
-    file.createVariable("brightness_temperature", "f4", dimensions = ("samples", "channels"))
-    file.createVariable("bt_min", "f4", dimensions = ("channels"))
-    file.createVariable("bt_max", "f4", dimensions = ("channels"))
-    file.createVariable("latitude", "f4", dimensions = ("samples",))
-    file.createVariable("longitude", "f4", dimensions = ("samples",))
-    file.createVariable("surface_type", "f4", dimensions = ("samples",))
-    file.createVariable("tcwv", "f4", dimensions = ("samples",))
-    file.createVariable("t2m", "f4", dimensions = ("samples",))
-    file.createVariable("surface_precipitation", "f4", dimensions = ("samples",))
-    # Also include date.
-    file.createVariable("year", "i4", dimensions = ("samples",))
-    file.createVariable("month", "i4", dimensions = ("samples",))
-    file.createVariable("day", "i4", dimensions = ("samples",))
-    file.createVariable("hour", "i4", dimensions = ("samples",))
-    file.createVariable("minute", "i4", dimensions = ("samples",))
-    file.createVariable("second", "i4", dimensions = ("samples",))
-
-    file["bt_min"][:] = 1e30
-    file["bt_max"][:] = 0.0
-
-    return file
-
-def extract_data(base_path,
-                 year,
-                 month,
-                 day,
-                 samples,
-                 file):
-    """
-    Extract training data from binary files for given year, month and day.
-
-    Arguments:
-        base_path(str): Base directory containing the training data.
-        year(int): The year from which to extract the training data.
-        month(int): The month from which to extract the training data.
-        day(int): The day for which to extract training data.
-        file: File handle of the netCDF4 file into which to store the results.
-    """
-    path = os.path.join(base_path,
-                        "{:02d}{:02d}".format(year, month),
-                        "*20{:02d}{:02d}{:02d}*.dat".format(year, month, day))
-    files = glob.glob(path)
-    if len(files) > 0:
-        samples_per_file = samples // len(files)
-        for i, f in enumerate(files):
-            n = samples_per_file
-            if i < samples % len(files):
-                n += 1
-            with open(f, 'rb') as fn:
-                data = read_file(fn)
-                write_to_file(file, data, samples = n)
-
-################################################################################
+###############################################################################
 # GProf spatial data
-################################################################################
+###############################################################################
 
 class GprofSpatialData:
-    def __init__(self, filename, n = -1):
+    def __init__(self, filename, n=-1):
         self.file = Dataset(filename)
 
         x = self.file["x"][:n, :, :, :]
@@ -574,7 +439,8 @@ class GprofSpatialData:
                                    x[:, :, :, i] < 500.0)
             x_min = x[valid, i].min()
             x_max = x[valid, i].max()
-            x_normed[:, :, :, i] = -0.9 + 1.9 * (x[:, :, :, i] - x_min) / (x_max - x_min)
+            x_normed[:, :, :, i] = -0.9 + 1.9 * (x[:, :, :, i] - x_min)
+            x_normed /= (x_max - x_min)
             x_normed[~valid, i] = -1.0
             self.x_maxs[i] = x_max
             self.x_mins[i] = x_min
@@ -587,7 +453,7 @@ class GprofSpatialData:
 
         n = self.y.shape[1] // 2
         self.y[:, :, :n - 10] = -1
-        self.y[:, :, (n + 10) :] = -1
+        self.y[:, :, (n + 10):] = -1
 
     def __len__(self):
         return self.x.shape[0]
@@ -603,7 +469,7 @@ class GprofSpatialData:
 
         ind = np.random.randint(self.x.shape[0])
 
-        f = plt.figure(figsize = (16, 4))
+        f = plt.figure(figsize=(16, 4))
         gs = GridSpec(1, 4)
 
         for i, j in enumerate([5, 9, 12]):

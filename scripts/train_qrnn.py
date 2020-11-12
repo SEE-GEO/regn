@@ -7,6 +7,9 @@ from regn.models.torch import FullyConnected
 from typhon.retrieval.qrnn import set_backend, QRNN
 import typhon.retrieval.qrnn.qrnn
 from torch.utils.data import DataLoader
+import torch
+from torch import nn
+from torch import optim
 
 ###############################################################################
 # Command line arguments.
@@ -74,13 +77,50 @@ model.quantiles = quantiles
 model.backend = "typhon.retrieval.qrnn.models.pytorch"
 qrnn = QRNN(training_data.dataset.input_features, model=model)
 
+optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 10)
+qrnn.train(training_data=training_data,
+           validation_data=validation_data,
+           convergence_epochs=0,
+           delta_at=1e-3,
+           maximum_epochs=10,
+           optimizer=optimizer,
+           learning_rate_scheduler=scheduler,
+           gpu=True)
+optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 10)
+qrnn.train(training_data=training_data,
+           validation_data=validation_data,
+           initial_learning_rate=0.1,
+           convergence_epochs=0,
+           delta_at=1e-3,
+           maximum_epochs=5,
+           optimizer=optimizer,
+           learning_rate_scheduler=scheduler,
+           gpu=True)
+optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 10)
+qrnn.train(training_data=training_data,
+           validation_data=validation_data,
+           initial_learning_rate=0.1,
+           convergence_epochs=0,
+           delta_at=1e-3,
+           maximum_epochs=5,
+           optimizer=optimizer,
+           learning_rate_scheduler=scheduler,
+           gpu=True)
+optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 10)
 losses = qrnn.train(training_data=training_data,
                     validation_data=validation_data,
-                    initial_learning_rate=1.0,
-                    convergence_epochs=5,
+                    initial_learning_rate=0.1,
+                    convergence_epochs=0,
                     delta_at=1e-3,
-                    maximum_epochs=20,
+                    maximum_epochs=5,
+                    optimizer=optimizer,
+                    learning_rate_scheduler=scheduler,
                     gpu=True)
+
 
 #
 # Store results
