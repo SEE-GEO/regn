@@ -9,10 +9,13 @@ import matplotlib as plt
 from matplotlib.gridspec import GridSpec
 import numpy as np
 import netCDF4
+import xarray
 import torch
 from torch.utils.data import Dataset
 import xarray
 import pandas as pd
+import typhon
+from typhon.retrieval.scores import quantile_score
 
 
 ###############################################################################
@@ -108,11 +111,13 @@ class GPROFDataset(ABC):
 
         self.x = self.normalizer(self.x)
 
+        self.log_rain_rates = log_rain_rates
         if log_rain_rates:
             self.transform_log()
 
+        self.rain_threshold = rain_threshold
         if rain_threshold:
-            self.y = (self.y > rain_threshold).astype(np.float32)
+            self.y = np.maximum(self.y, rain_threshold)
 
     @abstractmethod
     def _get_normalizer(self):
@@ -211,7 +216,9 @@ class GMIDataset(GPROFDataset):
                  normalizer=None,
                  log_rain_rates=False,
                  rain_threshold=None,
-                 normalize=True):
+                 shuffle=True,
+                 normalize=True,
+                 subsample=1):
         """
         Create instance of the dataset from a given file path.
 
@@ -231,11 +238,13 @@ class GMIDataset(GPROFDataset):
         """
         self.normalize = normalize
         self.surface_type = surface_type
+        self.subsample = subsample
         super().__init__(path,
                          batch_size,
                          normalizer,
                          log_rain_rates,
-                         rain_threshold)
+                         rain_threshold,
+                         shuffle)
 
     def _get_normalizer(self):
         if self.normalize:
@@ -249,12 +258,26 @@ class GMIDataset(GPROFDataset):
         return Normalizer(0.0, 1.0)
 
     def _load_data(self, path):
-        self.file = netCDF4.Dataset(path, mode="r")
 
-        tcwv = self.file.variables["tcwv"][:]
-        surface_type_data = self.file.variables["surface_type"][:]
-        t2m = self.file.variables["t2m"][:]
-        bt = self.file.variables["brightness_temperature"][:]
+        self.file = netCDF4.Dataset(path, mode="r")
+        file = self.file
+
+        step = self.subsample
+        tcwv = file["tcwv"][::step].data
+        surface_type_data = file["surface_type"][::step].data
+        t2m = file["t2m"][::step].data
+
+        v_bt = file["brightness_temperature"]
+        m, n = v_bt.shape
+        bt = np.zeros((m, n))
+        index_start = 0
+        chunk_size = 1024
+        while index_start < m:
+            index_end = index_start + chunk_size
+            bt[index_start: index_end, :] = v_bt[index_start: index_end, :].data
+            index_start += chunk_size
+        self.y = file["surface_precipitation"][:].data
+        self.y = self.y.reshape(-1, 1)
 
         valid = surface_type_data > 0
         valid *= t2m > 0
@@ -267,8 +290,6 @@ class GMIDataset(GPROFDataset):
         tcwv = tcwv[inds].reshape(-1, 1)
         t2m = t2m[inds].reshape(-1, 1)
 
-        print("loading 1")
-
         surface_type_data = surface_type_data[inds].reshape(-1, 1)
         surface_type_min = 1
         surface_type_max = 15
@@ -278,20 +299,89 @@ class GMIDataset(GPROFDataset):
         indices = (surface_type_data - surface_type_min).astype(int)
         surface_type_1h[np.arange(surface_type_1h.shape[0]),
                         indices.ravel()] = 1.0
+
         bt = bt[inds]
 
-        print("loading 2")
         self.n_obs = bt.shape[-1]
         self.n_surface_classes = n_classes
         if self.surface_type < 0:
             self.x = np.concatenate([bt, t2m, tcwv, surface_type_1h], axis=1)
         else:
             self.x = np.concatenate([bt, t2m, tcwv], axis=1)
-        self.x = self.x.data
-        self.y = self.file.variables["surface_precipitation"][inds]
-        self.y = self.y.data.reshape(-1, 1)
+        self.y = self.y[inds]
         self.input_features = self.x.shape[1]
 
+    def evaluate(self, model, n=-1):
+
+        if self.batch_size:
+            batch_size = self.batch_size
+        else:
+            batch_size = 1
+
+        if "gprof" in self.file.groups:
+            has_gprof = True
+        else:
+            has_gprof = False
+
+        i_start = 0
+        n_samples = self.x.shape[0]
+        indices = np.random.permutation(n_samples)
+        if n < 0:
+            n = n_samples
+
+        columns = ["y_true",
+                   "surface_type",
+                   "y_mean",
+                   "crps"]
+        columns += [rf"y({t})" for t in model.quantiles]
+        columns += [rf"qs({t})" for t in model.quantiles]
+        results = pd.DataFrame(columns=columns)
+        if has_gprof:
+            columns += ["y_gprof",
+                        "y_gprof_1st_tertial",
+                        "y_gprof_2nd_tertial",
+                        "gprof_pop"]
+
+        while i_start < n:
+            print(f"Processing: {i_start} / {n}", end="\r")
+            i_end = i_start + batch_size
+            x = self.x[indices[i_start:i_end], :]
+            y = self.y[indices[i_start:i_end], :]
+            y_pred = model.predict(x)
+            y_mean = model.posterior_mean(x)
+
+            if self.log_rain_rates:
+                y = 10 ** y
+                y_pred = 10 ** y_pred
+                y_mean = 10 ** y_mean
+            surface_type = np.where(x[:, 15:] + 0.5)[1]
+            crps = model.__class__.crps(y_pred, y, model.quantiles)
+            quantile_scores = quantile_score(y_pred, y, model.quantiles)
+
+            data = [y, surface_type.reshape(-1, 1), y_mean.reshape(-1, 1),
+                    crps.reshape(-1, 1), y_pred, quantile_scores]
+            if has_gprof:
+                g = self.file.groups["gprof"]
+                v_sp = g["surface_precipitation"]
+                gprof_surface_precipitation = v_sp[indices[i_start: i_end]]
+                print(gprof_surface_precipitation)
+                v_pop = g["probability_of_precipitation"]
+                gprof_pop = v_pop[indices[i_start: i_end]]
+                v_1st = g["1st_tertial"]
+                gprof_1st_tertial = v_1st[indices[i_start: i_end]]
+                v_2nd = g["2nd_tertial"]
+                gprof_2nd_tertial = v_2nd[indices[i_start: i_end]]
+
+                data += [gprof_surface_precipitation.reshape(-1, 1),
+                         gprof_1st_tertial.reshape(-1, 1),
+                         gprof_2nd_tertial.reshape(-1, 1),
+                         gprof_pop.reshape(-1, 1)]
+
+            results_tmp = np.concatenate(data, axis=-1)
+
+            results = results.append(pd.DataFrame(results_tmp, columns=columns))
+            i_start += batch_size
+        return results
 
 ###############################################################################
 # MHS Dataset
@@ -351,12 +441,26 @@ class MHSDataset(GPROFDataset):
         return Normalizer(np.array([0.0]), np.array([1.0]))
 
     def _load_data(self, path):
+
         self.file = netCDF4.Dataset(path, mode="r")
 
         tcwv = self.file.variables["tcwv"][:]
         surface_type_data = self.file.variables["surface_type"][:]
         t2m = self.file.variables["t2m"][:]
-        bt = self.file.variables["brightness_temperature"][:]
+
+        v_bt = self.file["brightness_temperature"]
+        v_sp = self.file["surface_precipitation"]
+        m, n, o = v_bt.shape
+        bt = np.zeros((m, n, o))
+        surface_precipitation = np.zeros((m, n))
+        index_start = 0
+        chunk_size = 1024
+        while index_start < m:
+            index_end = index_start + chunk_size
+            bt[index_start: index_end, :, :] = v_bt[index_start: index_end, :, :]
+            surface_precipitation[index_start:index_end, :] = v_sp[index_start: index_end, :]
+            index_start += chunk_size
+        self.y = surface_precipitation.reshape(-1, 1)
 
         valid = surface_type_data > 0
         valid *= t2m > 0
@@ -407,10 +511,7 @@ class MHSDataset(GPROFDataset):
             )
         else:
             self.x = np.concatenate([bt, t2m, tcwv, viewing_angles], axis=1)
-        self.x = self.x.data
-
-        self.y = self.file.variables["surface_precipitation"][inds]
-        self.y = self.y.data.reshape(-1, 1)
+        self.x = self.x
 
         self.input_features = self.x.shape[1]
 
@@ -431,16 +532,20 @@ class MHSDataset(GPROFDataset):
                    "viewing_angle",
                    "y_mean"]
         columns += [rf"y({t})" for t in model.quantiles]
+        columns += [rf"qs({t})" for t in model.quantiles]
         results = pd.DataFrame(columns=columns)
 
         while i_start < n_samples:
             x = self.x[i_start:i_start + batch_size, :]
             y = self.y[i_start:i_start + batch_size, :]
             y_pred = model.predict(x)
+            y_pred[y_pred < 1e-3] = 0.0
             y_mean = model.posterior_mean(x)
+            y_mean[y_pred < 1e-3] = 0.0
             surface_type = np.where(x[:, 7:-1] - 0.5)[1]
             viewing_angles = x[:, -1] * viewing_angle_std + viewing_angle_mean
             viewing_angles = np.round(viewing_angles, decimals=2)
+            quantile_scores = quantiles_score(y, y_pred, model.quantiles)
 
             results_tmp = np.concatenate([y,
                                           surface_type.reshape(-1, 1),
@@ -448,6 +553,7 @@ class MHSDataset(GPROFDataset):
                                           y_mean.reshape(-1, 1),
                                           y_pred],
                                          axis=-1)
+
             results = results.append(pd.DataFrame(results_tmp, columns=columns))
             i_start += batch_size
         return results

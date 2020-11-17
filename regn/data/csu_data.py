@@ -12,20 +12,6 @@ import numpy as np
 import netCDF4
 
 
-def check_sample(data):
-    """
-    Check that brightness temperatures of a sample are within a valid range.
-
-    Arguments:
-        data: The data array containing the data of one training sample.
-
-    Return:
-        Bool indicating whether the given sample contains valid brightness
-        temperatures.
-    """
-    return all([data[i] > 0 and data[i] < 1000 for i in range(13, 26)])
-
-
 def get_files(base_path, year, month, day):
     """
     Iterate over files for specific year, month and day.
@@ -90,6 +76,21 @@ class GMIBinaryFile:
                                 dtype=PIXEL_TYPES_GMI,
                                 offset= 10 + 8 * 13,
                                 mode="r")
+
+    def check_sample(data):
+        """
+        Check that brightness temperatures of a sample are within a valid range.
+
+        Arguments:
+            data: The data array containing the data of one training sample.
+
+        Return:
+            Bool indicating whether the given sample contains valid brightness
+            temperatures.
+        """
+        return all([data[i] > 0 and data[i] < 1000 for i in range(13, 26)])
+
+
 
     @classmethod
     def create_output_file(cls, filename):
@@ -166,14 +167,12 @@ class GMIBinaryFile:
         if samples < 0:
             samples = n_samples
         indices = np.random.permutation(np.arange(n_samples))
+        data = self.pixels[indices[:samples]]
 
         n_extracted = 0
-        for index in indices:
-            if n_extracted >= samples:
-                break
-            if not check_sample(self.pixels[index]):
+        for d in data:
+            if not GMIBinaryFile.check_sample(d):
                 continue
-            d = self.pixels[index]
             i = file.dimensions["samples"].size
 
             v_year[i] = d[2]
@@ -229,6 +228,21 @@ PIXEL_TYPES_MHS += [(f'cnvprcp_{i}', 'f4') for i in range(10)]
 
 
 class MHSBinaryFile:
+
+    def check_sample(data):
+        """
+        Check that brightness temperatures of a sample are within a valid range.
+
+        Arguments:
+            data: The data array containing the data of one training sample.
+
+        Return:
+            Bool indicating whether the given sample contains valid brightness
+            temperatures.
+        """
+        return all([data[i] > 0 and data[i] < 1000 for i in range(13, 53)])
+
+
     """
     Class to extract data from MHS CSU binary files and store to
     NetCDF file.
@@ -295,6 +309,7 @@ class MHSBinaryFile:
         file.createVariable("minute", "i4", dimensions=("samples",))
         file.createVariable("second", "i4", dimensions=("samples",))
 
+        mhs_data = MHSBinaryFile("/home/simonpf/Dendrite/UserAreas/Teo/MHS/1409/MHS.CSU.20140902.002900.dat")
         file["viewing_angles"][:] = [mhs_data.header[0][i] for i in range(7, 17)]
         file["frequencies"][:] = [mhs_data.header[0][i] for i in range(2, 7)]
         file["tbs_min"][:] = 1e30
@@ -331,15 +346,13 @@ class MHSBinaryFile:
         if samples < 0:
             samples = n_samples
         indices = np.random.permutation(np.arange(n_samples))
+        data = self.pixels[indices[:samples]]
 
-        n_extracted = 0
-        for index in indices:
-            if n_extracted >= samples:
-                break
-            if not check_sample(self.pixels[index]):
+        for d in data:
+            if not MHSBinaryFile.check_sample(d):
                 continue
-            d = self.pixels[index]
             i = file.dimensions["samples"].size
+            print(i)
 
             v_year[i] = d[2]
             v_month[i] = d[3]
@@ -363,9 +376,7 @@ class MHSBinaryFile:
                 v_surf_precip[i, j] = sp
                 cp = d[13 + 60 + j]
                 v_conv_precip[i, j] = cp
-            n_extracted += 1
 
-mhs_data = MHSBinaryFile("/home/simonpf/Dendrite/UserAreas/Teo/MHS/1409/MHS.CSU.20140902.002900.dat")
 
 ###############################################################################
 # GPROF binary data
@@ -492,7 +503,6 @@ def get_gprof_file(filename):
         The path of the corresponding binary GPROF file.
     """
     data = Path(filename).name.split(".")[2:4]
-    print(data)
     exp = re.compile(f".*{data[0]}.*{data[1]}\.BIN")
     path = Path.home() / "Dendrite/UserAreas/Simon/GPROF"
     files = path.glob("**/*.BIN")
@@ -603,10 +613,33 @@ class GPROFBinaryFile:
         n = len(nx)
         n_samples = file.dimensions["samples"].size
         indices = (n_samples - n, n_samples)
+        offset = n_samples - n
         for i, (x, y) in enumerate(zip(nx, ny)):
             d = self[x, y]
-            v_sp[i] = d["surface_precipitation"]
-            v_cp[i] = d["convective_precipitation"]
-            v_1t[i] = d["1st_tertial"]
-            v_2t[i] = d["2nd_tertial"]
-            v_pop[i] = d["probability_of_precipitation"]
+            v_sp[offset + i] = d["surface_precipitation"]
+            v_cp[offset + i] = d["convective_precipitation"]
+            v_1t[offset + i] = d["1st_tertial"]
+            v_2t[offset + i] = d["2nd_tertial"]
+            v_pop[offset + i] = d["probability_of_precipitation"]
+
+###############################################################################
+# GPROF retrieval data
+###############################################################################
+
+def get_retrieval_file(filename):
+    """
+    Get binary GPROF retrieval file matching database file.
+
+    Args:
+        filename: The filename of the training database file.
+
+
+    Returns:
+        The path of the corresponding binary GPROF file.
+    """
+    data = Path(filename).name.split(".")[2:4]
+    exp = re.compile(f".*{data[0]}.*{data[1]}\.BIN")
+    path = Path.home() / f"src/regn/scripts/{sensor}"
+    files = path.glob("*.HDF5")
+    match = [file for file in files if exp.match(file.name)]
+    return match[0]
