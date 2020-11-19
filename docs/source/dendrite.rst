@@ -17,7 +17,7 @@ To do so, add the following line to it:
 
 .. code-block:: none
 
-   alias="sshfs <your_username>@129.16.35.202:/mnt/array1/share ~/Dendrite"
+   alias dendrite="sshfs <your_username>@129.16.35.202:/mnt/array1/share ~/Dendrite"
 
 
 If you need to remount Dendrite, for example after a restart, you can now do so by simply

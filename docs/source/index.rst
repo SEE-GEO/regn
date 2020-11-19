@@ -23,6 +23,7 @@ satellite observations of the Global Precipitation Measurement (`GPM
 
    overview
    data
+   rain_classification
 
 .. toctree::
    :maxdepth: 1
