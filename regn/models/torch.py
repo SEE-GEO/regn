@@ -32,9 +32,11 @@ class FullyConnected(PytorchModel, nn.Module):
                  layers,
                  width,
                  activation=nn.ReLU,
+                 log=False,
                  skip_connections=True,
                  batch_norm=True):
 
+        self.log = log
         self.skip_connections = skip_connections
         output_features = len(quantiles)
         PytorchModel.__init__(self, input_features, quantiles)
@@ -62,4 +64,6 @@ class FullyConnected(PytorchModel, nn.Module):
             y = torch.cat((y, y), -1)
         for l in self.mods[1:]:
             y = l.forward(y)
+        if self.log:
+            y = torch.exp(y)
         return y

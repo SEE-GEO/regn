@@ -11,11 +11,13 @@ import numpy as np
 import netCDF4
 import xarray
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import xarray
 import pandas as pd
 import typhon
+import tqdm
 from typhon.retrieval.scores import quantile_score
+from pathlib import Path
 
 
 ###############################################################################
@@ -179,10 +181,10 @@ class GPROFDataset(ABC):
         range [0, rr.min()].
         """
         y = np.copy(self.y)
-        y_min = y[y > 0.0].min()
-        inds = y == 0.0
-        y[inds] = np.random.uniform(0.0, y_min, inds.sum())
-        y = np.log10(y)
+        #y[inds] = np.random.uniform(0.0, y_min, inds.sum())
+        inds = y < 1e-4
+        y[inds] = 10 ** np.random.uniform(-6, -4, inds.sum())
+        y = np.log(y)
         self.y = y
 
     def store_normalization_data(self, filename):
@@ -364,7 +366,6 @@ class GMIDataset(GPROFDataset):
                 g = self.file.groups["gprof"]
                 v_sp = g["surface_precipitation"]
                 gprof_surface_precipitation = v_sp[indices[i_start: i_end]]
-                print(gprof_surface_precipitation)
                 v_pop = g["probability_of_precipitation"]
                 gprof_pop = v_pop[indices[i_start: i_end]]
                 v_1st = g["1st_tertial"]
@@ -557,6 +558,51 @@ class MHSDataset(GPROFDataset):
             results = results.append(pd.DataFrame(results_tmp, columns=columns))
             i_start += batch_size
         return results
+
+class GPROFTestData:
+    def __init__(self, path):
+        self.gprof_output = np.loadtxt(Path(path) / "test_GPROF_output_1")
+        self.ground_truth = np.loadtxt(Path(path) / "test_ground_truth_1")
+        self.qrnn_input = np.loadtxt(Path(path) / "test_qrnn_input_1")
+
+        valid = self.gprof_output[:, 0] >= 0.0
+        valid *= np.all(self.qrnn_input >= 0.0, axis=-1)
+        valid *= np.all(self.qrnn_input <= 500.0, axis=-1)
+        self.gprof_output = self.gprof_output[valid]
+        self.ground_truth = self.ground_truth[valid]
+        self.qrnn_input = self.qrnn_input[valid]
+
+        n_samples = self.qrnn_input.shape[0]
+        surface_types = np.zeros((n_samples, 14))
+        surface_types[np.arange(n_samples), self.qrnn_input[:, -1].astype(int) - 1] = 1.0
+        self.x = np.concatenate([self.qrnn_input[:, :13],
+                                 self.qrnn_input[:, [14]],
+                                 self.qrnn_input[:, [13]],
+                                 surface_types], axis=-1)
+
+    def evaluate_model(self, model, normalizer):
+
+        x = self.x
+
+        y_qrnn = np.zeros((x.shape[0], len(model.quantiles)))
+        y_qrnn_mean = np.zeros(x.shape[0])
+        index = 0
+        batch_size = 1024
+        while index < self.qrnn_input.shape[0]:
+            batch = self.qrnn_input[index: index + batch_size, :]
+            y_qrnn[index : index + batch_size, :] = model.predict(batch)
+            y_qrnn_mean[index : index + batch_size] = model.posterior_mean(batch)
+            index += batch_size
+
+        self.y_qrnn = y_qrnn
+        self.y_qrnn_mean = y_qrnn_mean
+
+    def calculate_errors(self):
+        y_true = self.ground_truth[:, 0]
+        self.dy_gprof = self.gprof_output[:, 0] - y_true
+        n = self.y_qrnn.shape[1]
+        self.dy_qrnn_median = self.y_qrnn[:, n // 2] - y_true
+        self.dy_qrnn_mean = self.y_qrnn_mean - y_true
 
 
 ###############################################################################
