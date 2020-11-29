@@ -1,0 +1,195 @@
+#+TITLE: A neural-network-based Bayesian precipitation retrieval
+#+SUBTITLE: for GPM Passive Microwave Observations
+#+AUTHOR: @@latex: \textbf{Simon Pfreunschuh}$^{1}$\\[0.1cm]@@ Teodor Norrestad @@latex: $^{2}$\\[0.05cm]@@  Patrick Eriksson @@latex: $^1$\\[0.05cm]@@ Inderpreet Kaur @@latex: $^{1}$\\[0.05cm] @@ Christian D. Kummerow @@latex: $^{3}$\\[0.05cm]@@
+#+EMAIL: simon.pfreundschuh@chalmers.se
+#+OPTIONS: H:2 toc:nil
+#+LaTeX_CLASS_OPTIONS: [9pt]
+#+LaTeX_HEADER: \institute{$^{1}$ Chalmers University of Technology \\ $^{2}$ previously Chalmers University of Technology \\ $^{3}$ Colorado State University}
+#+LaTeX_HEADER: \usepackage{natbib}
+#+LaTeX_HEADER: \usepackage{siunitx}
+#+LaTeX_HEADER: \usepackage{subcaption}
+#+LaTeX_HEADER: \usepackage{todonotes}
+#+LaTeX_HEADER: \usepackage{units}
+#+LATEX_HEADER: \usepackage{dirtree}
+#+LaTeX_HEADER: \usetheme{chalmers}
+#+LATEX_HEADER: \newcommand\blfootnote[1]{\begingroup \renewcommand\thefootnote{}\footnote{#1} \addtocounter{footnote}{-1} \endgroup}
+#+LaTeX_HEADER: \setbeamerfont{title}{size=\LARGE}
+
+* Outline
+
+* Background: GPM and GPROF
+** Background: GPM and GPROF
+   - \textbf{Global Precipitation Measurement (GPM)}: Constellation of microwave
+    radiometers providing frequent ($T \leq 3 \unit{h}$) global measurements of precipitation
+
+   - \textbf{Goddard Profiling Algorithm (GPROF)}:  The retrieval algorithm used to retrieve
+     precipitations profiles.
+
+  \blfootnote{Image source: NASA}
+
+   \centering
+  \includegraphics[width=0.65\textwidth]{figures/gpm_constellation}
+
+** Outline
+ \begin{alertblock}{Research question:}   
+    \textbf{Can we use a neural-network-based retrieval in the next verion of GPROF?}
+ \end{alertblock}
+ \vspace{1cm}
+*** Why?
+   - Simpler and likely faster
+   - Greater flexibility with respect to input variables
+   - Better retrievals?
+
+*** How?
+    - 1-to-1 comparison with current GPROF implementation using identical training data
+
+*** More information, code and models
+    - Check out the project page: https://github.com/see-mof/regn
+
+** GPROF Version 5
+
+- Bayesian retrieval method
+- Posterior approximated using importance sampling based on obs. error
+- A priori databases stratified by surface type,  two-meter temperature, total column water vapor
+
+ \vspace{0.5cm}
+  
+  \centering
+  \includegraphics[width=0.8\textwidth]{figures/mci_2}
+
+
+** QRNN
+
+ \vspace{0.5cm}
+  
+  \centering
+  \includegraphics[width=1.0\textwidth]{figures/qrnn}
+
+** QRNN
+
+*** A block                                           :B_ignoreheading:BMCOL:
+    :PROPERTIES:
+    :BEAMER_col: 0.4
+    :END:
+
+**** Predicted posterior
+     \vspace{1cm}
+    \includegraphics[width=\textwidth]{figures/cdf}
+
+*** A screenshot                                            :BMCOL:B_example:
+    :PROPERTIES:
+    :BEAMER_col: 0.6
+    :END:
+
+**** Derived quantities
+
+  - Point predictors:
+    - Median: $x_{\tau=.5}$
+    - Posterior mean: $\mathbf{E}(x|y) = \int x\: dF$
+  - Confidence intervals:
+    \begin{align*}
+    P(x_{\tau=.45} < X \leq x_{\tau=.55}) &= 10\% \\
+    P(x_{\tau=.35} < X \leq x_{\tau=.65}) &= 30\% \\
+    \ldots &
+      \end{align*}
+  - Classifier:
+    \begin{align*}
+    P(X > x) = 1 - F(x)
+    \end{align*}
+
+** Our Experiment
+
+*** Can QRNN replace BMCI?
+*** A block                                           :B_ignoreheading:BMCOL:
+    :PROPERTIES:
+    :BEAMER_col: 0.6
+    :END:
+**** Training
+    - Data: GPROF V5 retrieval database (GMI/DPR combined observations)
+    - QRNN: Fully-connected NN, 10 layers, 128 neurons, ReLU activations
+
+**** Evaluation
+    - Real GMI observations matched to nearest sample in retrieval database
+    - Data subsampled to decrease redundancy
+
+*** A block                                           :B_ignoreheading:BMCOL:
+    :PROPERTIES:
+    :BEAMER_col: 0.45
+    :END:
+    \includegraphics[width=\textwidth]{figures/colocations}
+
+
+** Accuracy of point estimates
+    - Reduced bias in QRNN results
+    - Minor reductions in MSE and MAE
+
+   \includegraphics[width=\textwidth]{figures/error_distributions}
+
+** Accuracy of point estimates
+    - Reductions mostly consistent across surface types
+
+   \includegraphics[width=\textwidth]{figures/error_summary}
+
+
+** Calibration of uncertainty estimates
+*** A block                                           :B_ignoreheading:BMCOL:
+    :PROPERTIES:
+    :BEAMER_col: 0.5
+    :END:
+
+     - Predicted confidence intervals consistent with observed deviations
+     - Not the case for GPROF 1st and 3rd precipitation terciles
+
+*** A block                                           :B_ignoreheading:BMCOL:
+    :PROPERTIES:
+    :BEAMER_col: 0.5
+    :END:
+   \includegraphics[width=\textwidth]{figures/calibration}
+
+** Classification accuracy
+
+*** A block                                           :B_ignoreheading:BMCOL:
+    :PROPERTIES:
+    :BEAMER_col: 0.5
+    :END:
+**** Calibration of point estimates
+     - Raining/Non-raining classification, threshold = $0.01\ \unit{mm\ h^{-1}}$
+     - QRNN predictions more reliable the GPROF probability of precipitation
+
+*** A block                                           :B_ignoreheading:BMCOL:
+    :PROPERTIES:
+    :BEAMER_col: 0.5
+    :END:
+   \includegraphics[width=\textwidth]{figures/roc}
+
+** Validation against ground radar
+*** GMI
+    
+   \includegraphics[width=\textwidth]{figures/colocations_gmi}
+
+
+** Validation against ground radar
+*** MHS
+
+   \includegraphics[width=\textwidth]{figures/colocations_mhs}
+
+** Conclusions
+*** Can QRNNs replace MCI?
+    - First results indicate yes
+    - Potential improvements:
+      - Slight improvement of point estimates
+      - \textbf{More accurate uncertainty estimates}
+      - More flexibility (input variable), faster processing, simpler
+
+
+** Future work
+*** Next steps
+    - Implement QRNN-based GPROF version and run in parallel with GPROF V6
+    - Evaluate QRNN-based GPROF in production
+
+*** Open questions
+    - Profile retrievals
+    - Correlated errors
+
+*** More information, code and models
+    - Check out the project page: https://github.com/see-mof/regn
