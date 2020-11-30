@@ -16,7 +16,7 @@ import xarray
 import pandas as pd
 import typhon
 import tqdm
-from typhon.retrieval.scores import quantile_score
+import qrnn.functional as qf
 from pathlib import Path
 
 
@@ -350,15 +350,15 @@ class GMIDataset(GPROFDataset):
             x = self.x[indices[i_start:i_end], :]
             y = self.y[indices[i_start:i_end], :]
             y_pred = model.predict(x)
-            y_mean = model.posterior_mean(x)
+            y_mean = qf.posterior_mean(y_pred, model.quantiles)
 
             if self.log_rain_rates:
                 y = 10 ** y
                 y_pred = 10 ** y_pred
                 y_mean = 10 ** y_mean
             surface_type = np.where(x[:, 15:] + 0.5)[1]
-            crps = model.__class__.crps(y_pred, y, model.quantiles)
-            quantile_scores = quantile_score(y_pred, y, model.quantiles)
+            crps = qf.crps(y_pred, model.quantiles, y)
+            quantile_scores = qf.quantile_loss(y_pred, model.quantiles, y)
 
             data = [y, surface_type.reshape(-1, 1), y_mean.reshape(-1, 1),
                     crps.reshape(-1, 1), y_pred, quantile_scores]
@@ -384,6 +384,202 @@ class GMIDataset(GPROFDataset):
             i_start += batch_size
         return results
 
+class GMITestset(GPROFDataset):
+    """
+    Pytorch dataset interface for the Gprof training data for the GMI sensor.
+
+    This class is a wrapper around the netCDF4 files that are used to store
+    the GProf training data. It provides as input vector the brightness
+    temperatures and as output vector the surface precipitation.
+
+    """
+    def __init__(self,
+                 path,
+                 batch_size=None,
+                 surface_type=-1,
+                 normalizer=None,
+                 log_rain_rates=False,
+                 rain_threshold=None,
+                 shuffle=True,
+                 normalize=True,
+                 subsample=1):
+        """
+        Create instance of the dataset from a given file path.
+
+        Args:
+            path: Path to the NetCDF4 containing the data.
+            batch_size: If positive, data is provided in batches of this size
+            surface_type: If positive, only samples of the given surface type
+                are provided. Otherwise the surface type index is provided as
+                input features.
+            normalization_data: Filename of normalization data to use to
+                normalize inputs.
+            log_rain_rates: Boolean indicating whether or not to transform
+                output to log space.
+            rain_threshold: If provided, the given value is applied to the
+                output rain rates to turn them into binary non-raining /
+                raining labels.
+        """
+        self.normalize = normalize
+        self.surface_type = surface_type
+        self.subsample = subsample
+        super().__init__(path,
+                         batch_size,
+                         normalizer,
+                         log_rain_rates,
+                         rain_threshold,
+                         shuffle)
+
+    def _get_normalizer(self):
+        if self.normalize:
+            x = self.x.astype(np.float64)
+            x_mean = np.mean(x, axis=0, keepdims=True)
+            x_sigma = np.std(x, axis=0, keepdims=True)
+            if self.surface_type < 0:
+                x_mean[0, 15:] = 0.5
+                x_sigma[0, 15:] = 1.0
+            return Normalizer(x_mean, x_sigma)
+        return Normalizer(0.0, 1.0)
+
+    def _load_data(self, path):
+
+        self.file = netCDF4.Dataset(path, mode="r")
+        file = self.file
+        gprof = file["gprof"]
+
+        step = self.subsample
+        tcwv = gprof["tcwv"][::step].data.astype(np.float32)
+        surface_type_data = gprof["surface_type"][::step].data
+        t2m = gprof["t2m"][::step].data.astype(np.float32)
+
+        v_bt = gprof["brightness_temperature"]
+        m, n = v_bt.shape
+        bt = np.zeros((m, n))
+        index_start = 0
+        chunk_size = 1024
+        while index_start < m:
+            index_end = index_start + chunk_size
+            bt[index_start: index_end, :] = v_bt[index_start: index_end, :].data
+            index_start += chunk_size
+        self.y_true = file["surface_precipitation"][:].data.astype(np.float32)
+        self.y_true = self.y_true.reshape(-1, 1)
+        self.y_gprof = gprof["surface_precipitation"][:].data.astype(np.float32)
+        self.y_gprof = self.y_gprof.reshape(-1, 1)
+        self.y_1st_tercile = gprof["1st_tertial"][:].data.astype(np.float32)
+        self.y_3rd_tercile = gprof["2nd_tertial"][:].data.astype(np.float32)
+        self.y_pop = gprof["probability_of_precipitation"][:].data.astype(np.float32)
+
+
+        valid = surface_type_data > 0
+        valid *= t2m > 0
+        valid *= tcwv > 0
+        valid *= self.y_gprof.ravel() > 0
+        if self.surface_type > 0:
+            valid *= surface_type_data == self.surface_type
+
+        inds = np.where(valid)[0]
+        self.inds = inds
+
+        tcwv = tcwv[inds].reshape(-1, 1)
+        t2m = t2m[inds].reshape(-1, 1)
+
+        surface_type_data = surface_type_data[inds].reshape(-1, 1)
+        surface_type_min = 1
+        surface_type_max = 15
+        n_classes = int(surface_type_max - surface_type_min)
+        surface_type_1h = np.zeros((surface_type_data.size, n_classes),
+                                   dtype=np.float32)
+        indices = (surface_type_data - surface_type_min).astype(int)
+        surface_type_1h[np.arange(surface_type_1h.shape[0]),
+                        indices.ravel()] = 1.0
+
+        bt = bt[inds]
+
+        self.n_obs = bt.shape[-1]
+        self.n_surface_classes = n_classes
+        if self.surface_type < 0:
+            self.x = np.concatenate([bt, t2m, tcwv, surface_type_1h], axis=1)
+        else:
+            self.x = np.concatenate([bt, t2m, tcwv], axis=1)
+        self.surface_type = surface_type_data
+        self.y = self.y_true[inds]
+        self.y_true = self.y_true[inds]
+        self.input_features = self.x.shape[1]
+        self.y_gprof = self.y_gprof[inds]
+        self.y_pop = self.y_pop[inds]
+        self.y_1st_tercile = self.y_1st_tercile[inds]
+        self.y_3rd_tercile = self.y_3rd_tercile[inds]
+
+    def evaluate(self, model, n=-1):
+
+        if self.batch_size:
+            batch_size = self.batch_size
+        else:
+            batch_size = 1
+
+        if "gprof" in self.file.groups:
+            has_gprof = True
+        else:
+            has_gprof = False
+
+        i_start = 0
+        n_samples = self.x.shape[0]
+        indices = np.random.permutation(n_samples)
+        if n < 0:
+            n = n_samples
+
+        columns = ["y_true",
+                   "surface_type",
+                   "y_mean",
+                   "crps"]
+        columns += [rf"y({t})" for t in model.quantiles]
+        columns += [rf"qs({t})" for t in model.quantiles]
+        results = pd.DataFrame(columns=columns)
+        if has_gprof:
+            columns += ["y_gprof",
+                        "y_gprof_1st_tertial",
+                        "y_gprof_2nd_tertial",
+                        "gprof_pop"]
+
+        while i_start < n:
+            print(f"Processing: {i_start} / {n}", end="\r")
+            i_end = i_start + batch_size
+            x = self.x[indices[i_start:i_end], :]
+            y = self.y[indices[i_start:i_end], :]
+            y_pred = model.predict(x)
+            y_mean = qf.posterior_mean(y_pred, model.quantiles)
+
+            if self.log_rain_rates:
+                y = 10 ** y
+                y_pred = 10 ** y_pred
+                y_mean = 10 ** y_mean
+            surface_type = np.where(x[:, 15:] + 0.5)[1]
+            crps = qf.crps(y_pred, model.quantiles, y)
+            quantile_scores = qf.quantile_loss(y_pred, model.quantiles, y)
+
+            data = [y, surface_type.reshape(-1, 1), y_mean.reshape(-1, 1),
+                    crps.reshape(-1, 1), y_pred, quantile_scores]
+            if has_gprof:
+                g = self.file.groups["gprof"]
+                v_sp = g["surface_precipitation"]
+                gprof_surface_precipitation = v_sp[indices[i_start: i_end]]
+                v_pop = g["probability_of_precipitation"]
+                gprof_pop = v_pop[indices[i_start: i_end]]
+                v_1st = g["1st_tertial"]
+                gprof_1st_tertial = v_1st[indices[i_start: i_end]]
+                v_2nd = g["2nd_tertial"]
+                gprof_2nd_tertial = v_2nd[indices[i_start: i_end]]
+
+                data += [gprof_surface_precipitation.reshape(-1, 1),
+                         gprof_1st_tertial.reshape(-1, 1),
+                         gprof_2nd_tertial.reshape(-1, 1),
+                         gprof_pop.reshape(-1, 1)]
+
+            results_tmp = np.concatenate(data, axis=-1)
+
+            results = results.append(pd.DataFrame(results_tmp, columns=columns))
+            i_start += batch_size
+        return results
 ###############################################################################
 # MHS Dataset
 ###############################################################################
@@ -546,7 +742,7 @@ class MHSDataset(GPROFDataset):
             surface_type = np.where(x[:, 7:-1] - 0.5)[1]
             viewing_angles = x[:, -1] * viewing_angle_std + viewing_angle_mean
             viewing_angles = np.round(viewing_angles, decimals=2)
-            quantile_scores = quantiles_score(y, y_pred, model.quantiles)
+            quantile_scores = qf.quantiles_loss(y, model.quantiles, y_pred)
 
             results_tmp = np.concatenate([y,
                                           surface_type.reshape(-1, 1),

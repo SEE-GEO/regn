@@ -56,6 +56,7 @@ include_gprof_data = args.include_gprof
 
 def extract_data(output_file,
                  input_file,
+                 filename,
                  samples,
                  start_index=None):
     """
@@ -74,7 +75,7 @@ def extract_data(output_file,
         n_after = start_index + samples
     else:
         n_before = output_file.dimensions["samples"].size
-        n_after = output_file.dimensions["samples"].size
+        n_after = n_before + samples
 
     input_file.write_to_file(output_file,
                              samples,
@@ -83,7 +84,7 @@ def extract_data(output_file,
     if include_gprof_data:
         lats = output_file["latitude"][n_before: n_after]
         lons = output_file["longitude"][n_before: n_after]
-        gprof_file = get_gprof_file(input_file)
+        gprof_file = get_gprof_file(filename)
         GPROFBinaryFile(gprof_file).add_to_file(output_file, lats, lons)
 
 def open_input_file(sensor_class, filename):
@@ -102,7 +103,7 @@ def process_month(year, month):
         The filename of the temporary file that contains the data from the
         given month.
     """
-    _, n_days = monthrange(2000 + y, m)
+    _, n_days = monthrange(2000 + year, month)
     if type == "training":
         days = np.arange(5, n_days + 1)
     elif type == "validation":
@@ -114,13 +115,16 @@ def process_month(year, month):
 
     with sensor_class.create_output_file(output_file) as netcdf_file:
         for d in tqdm.tqdm(days):
-            files = get_files(data_path, y, m, d)
+            files = get_files(data_path, year, month, d)
 
             input_files = []
 
             for file in files:
                 input_file = sensor_class(file)
-                extract_data(netcdf_file, input_file, samples)
+                extract_data(netcdf_file,
+                             input_file,
+                             file,
+                             samples)
     return output_file
 
 ###############################################################################
