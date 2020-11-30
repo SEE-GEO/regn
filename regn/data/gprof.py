@@ -271,7 +271,7 @@ class GMIDataset(GPROFDataset):
 
         v_bt = file["brightness_temperature"]
         m, n = v_bt.shape
-        bt = np.zeros((m, n))
+        bt = np.zeros((m, n), dtype=np.float32)
         index_start = 0
         chunk_size = 1024
         while index_start < m:
@@ -452,8 +452,8 @@ class MHSDataset(GPROFDataset):
         v_bt = self.file["brightness_temperature"]
         v_sp = self.file["surface_precipitation"]
         m, n, o = v_bt.shape
-        bt = np.zeros((m, n, o))
-        surface_precipitation = np.zeros((m, n))
+        bt = np.zeros((m, n, o), dtype=np.float32)
+        surface_precipitation = np.zeros((m, n), dtype=np.float32)
         index_start = 0
         chunk_size = 1024
         while index_start < m:
