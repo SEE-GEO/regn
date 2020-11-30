@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from typhon.retrieval.qrnn.models.pytorch.common import PytorchModel
+from quantnn.models.pytorch.common import PytorchModel
 
 class Block(nn.Sequential):
     def __init__(self,

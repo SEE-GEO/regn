@@ -14,9 +14,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import xarray
 import pandas as pd
-import typhon
-import tqdm
-import qrnn.functional as qf
+import quantnn.functional as qf
 from pathlib import Path
 
 
