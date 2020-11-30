@@ -13,6 +13,7 @@ import numpy as np
 import netCDF4
 import pyproj
 from pykdtree.kdtree import KDTree
+from h5py import File
 
 
 def to_euclidean(lats, lons):
@@ -102,7 +103,6 @@ class GMIBinaryFile:
             temperatures.
         """
         return all([data[i] > 0 and data[i] < 1000 for i in range(13, 26)])
-
 
     def __init__(self, filename):
         """
@@ -471,11 +471,9 @@ class MHSBinaryFile:
             n_extracted += 1
 
 
-
 ###############################################################################
 # GPROF binary data
 ###############################################################################
-
 HEADER_TYPES_GPROF = [('satcode', 'S5'),
                       ('sensor', 'S5')]
 HEADER_TYPES_GPROF += [(f'freq_{i}', "f4") for i in range(5)]
@@ -604,6 +602,23 @@ def get_gprof_file(filename):
     match = [file for file in files if exp.match(file.name)]
     return match[0]
 
+def get_gprof_l1c_file(filename):
+    """
+    Get binary GPROF retrieval file matching database file.
+
+    Args:
+        filename: The filename of the training database file.
+
+
+    Returns:
+        The path of the corresponding binary GPROF file.
+    """
+    data = Path(filename).name.split(((".")))[4]
+    exp = re.compile(f"1C-R.*{data}.*\.HDF5")
+    path = Path.home() / "Dendrite/UserAreas/Simon/GPROF/"
+    files = path.glob("**/*.HDF5")
+    match = [file for file in files if exp.match(file.name)]
+    return match[0]
 
 class GPROFBinaryFile:
     """
@@ -653,13 +668,12 @@ class GPROFBinaryFile:
 
         lats = np.zeros((self.n_scans, self.n_pixels))
         lons = np.zeros((self.n_scans, self.n_pixels))
+
         for i in range(self.n_scans):
             for j in range(self.n_pixels):
                 lats[i, j] = self[i, j]["latitude"]
                 lons[i, j] = self[i, j]["longitude"]
-        print(lons)
         coords = to_euclidean(lats.ravel(), lons.ravel())
-
         self.tree = KDTree(coords)
 
     @property
@@ -719,6 +733,13 @@ class GPROFBinaryFile:
                          dimensions=("samples",))
         g.createVariable("probability_of_precipitation", "f4",
                          dimensions=("samples",))
+        g.createVariable("brightness_temperature",
+                         "f4",
+                         dimensions=("samples",
+                                     "channels"))
+        g.createVariable("surface_type", "f4", dimensions=("samples",))
+        g.createVariable("tcwv", "f4", dimensions=("samples",))
+        g.createVariable("t2m", "f4", dimensions=("samples",))
 
     def add_to_file(self, file, lats, lons):
         """
@@ -740,12 +761,21 @@ class GPROFBinaryFile:
         scan_inds = inds // self.n_pixels
         pixel_inds = inds % self.n_pixels
 
+        l1c_file = File(get_gprof_l1c_file(self.filename), "r")
+        bts_1 = l1c_file["S1/Tc"]
+        bts_2 = l1c_file["S2/Tc"]
+
         group = file["gprof"]
         v_sp = group["surface_precipitation"]
         v_cp = group["convective_precipitation"]
         v_1t = group["1st_tertial"]
         v_2t = group["2nd_tertial"]
         v_pop = group["probability_of_precipitation"]
+        v_bt = group["brightness_temperature"]
+        v_st = group["surface_type"]
+        v_tcwv = group["tcwv"]
+        v_t2m = group["t2m"]
+
 
         n = len(lats)
         n_samples = file.dimensions["samples"].size
@@ -757,6 +787,11 @@ class GPROFBinaryFile:
             v_1t[offset + i] = d["1st_tertial"]
             v_2t[offset + i] = d["2nd_tertial"]
             v_pop[offset + i] = d["probability_of_precipitation"]
+            v_bt[offset + i, :9] = bts_1[x, y, :]
+            v_bt[offset + i, 9:] = bts_2[x, y, :]
+            v_st[offset + i] = d["surface_type_index"]
+            v_tcwv[offset + i] = d["total_water_vapor_index"]
+            v_t2m[offset + i] = d["temp_2m_index"]
 
     def find_matches(self, lats, lons):
         """
@@ -782,7 +817,6 @@ class GPROFBinaryFile:
         surface_precipitation = np.zeros(n)
 
         for i in range(n):
-            print(scan_inds[i], pixel_inds[i])
             d = self[scan_inds[i], pixel_inds[i]]
             lats_matched[i] = d["latitude"]
             lons_matched[i] = d["longitude"]

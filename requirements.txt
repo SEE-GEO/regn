@@ -1,0 +1,8 @@
+h5py
+netCDF4
+numpy
+pandas
+pyproj
+torch
+tqdm
+xarray
