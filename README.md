@@ -1,8 +1,8 @@
 # Robust Estimation of Global precipitation using Neural networks (REGN)
 
-As acronym, REGN stands for *Robust Estimation of Global precipitation using
-Neural networks*. At the same time, *regn* [rɛŋn] is the swedish word for
-*rain*. The aim of the REGN project is to developed a neural-network based
+The acronym REGN stands for *Robust Estimation of Global precipitation using
+Neural networks*. At the same time, *regn* ([rɛŋn]) is the swedish word for
+rain. The aim of the REGN project is to develop a neural-network based
 implementation of the GPROF algorithm.
 
 This repository is used to collect all of the code and and results from
@@ -21,13 +21,14 @@ Slides from the presentation can be found [here](https://raw.githubusercontent.c
 
 ## Running the code
 
-The code required to produce the presented results consists of two parts:
+The code required to reproduce the presented results consists of two parts:
 
 - The ``regn`` Python package, which implements the QRNN-based GPROF retrieval
-- The Jupyter notebooks contained in the [notebooks](notebooks) folder,
-  which contain the Python code  that performs all numerical analyses.
+- The Jupyter notebooks contained in the [notebooks/gmi](notebooks/gmi) and
+  [notebook/mhs](notebooks/mhs) folders, which contain the Python code which
+  performs the numerical analyses.
   
-### Dependencies
+### Python dependencies
 
 Our work builds on and requires a range publicly available packages, which
 are collected in the ``requirements.txt``. After cloning this repository, you
