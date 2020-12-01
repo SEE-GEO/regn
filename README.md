@@ -30,6 +30,9 @@ The code required to reproduce the presented results consists of two parts:
   
 ### Python dependencies
 
+> **Note**: Before installing any of these dependencies it is probably a good
+> idea to create a new environment using Python venv or conda.
+
 Our work builds on and requires a range publicly available packages, which
 are collected in the ``requirements.txt``. After cloning this repository, you
 can install these packages using:
@@ -47,6 +50,13 @@ The easiest way to achieve this is probably to just install the package using
 ````
 $ python3 -m p install -e .
 ````
+## The QRNN implementation
+
+We have recently migrated our implementation of QRNNs from the
+[typhon](https://github.com/atmtools/typhon/) package to a new, separate package
+called [quantnn](https://github.com/simonpf/quantnn). This is still
+relatively new and lacks extensive documentation but is what has been used within
+this study.
 
 ## References
 
