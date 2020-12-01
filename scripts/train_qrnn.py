@@ -82,33 +82,23 @@ model = FullyConnected(training_data.dataset.input_features,
                        n_layers,
                        n_neurons,
                        batch_norm=batch_norm,
+                       log=False,
                        skip_connections=skip_connections)
 model.quantiles = quantiles
 model.backend = "quantnn.models.pytorch"
 qrnn = QRNN(training_data.dataset.input_features, model=model)
 
 optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 40)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
 qrnn.train(training_data=training_data,
            validation_data=validation_data,
            convergence_epochs=0,
            delta_at=1e-3,
-           maximum_epochs=40,
+           maximum_epochs=20,
            optimizer=optimizer,
            learning_rate_scheduler=scheduler,
            gpu=True)
-#optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
-#scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
-#qrnn.train(training_data=training_data,
-#           validation_data=validation_data,
-#           initial_learning_rate=0.1,
-#           convergence_epochs=0,
-#           maximum_epochs=20,
-#           optimizer=optimizer,
-#           learning_rate_scheduler=scheduler,
-#           #adversarial_training=True,
-#           delta_at=1e-2,
-#           gpu=True)
+
 optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
 qrnn.train(training_data=training_data,
@@ -119,43 +109,17 @@ qrnn.train(training_data=training_data,
            optimizer=optimizer,
            learning_rate_scheduler=scheduler,
            gpu=True)
-optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+optimizer = optim.SGD(model.parameters(), lr=0.001)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
 qrnn.train(training_data=training_data,
            validation_data=validation_data,
            convergence_epochs=0,
+           delta_at=1e-3,
            maximum_epochs=20,
            optimizer=optimizer,
            learning_rate_scheduler=scheduler,
-           #adversarial_training=True,
-           delta_at=1e-2,
            gpu=True)
-optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
-qrnn.train(training_data=training_data,
-           validation_data=validation_data,
-           maximum_epochs=20,
-           optimizer=optimizer,
-           learning_rate_scheduler=scheduler,
-           #adversarial_training=True,
-           delta_at=1e-2,
-           gpu=True)
-optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
-losses = qrnn.train(training_data=training_data,
-                    validation_data=validation_data,
-	    	    maximum_epochs=20,
-		    optimizer=optimizer,
-		    learning_rate_scheduler=scheduler,
-		    gpu=True)
-optimizer = optim.SGD(model.parameters(), lr=0.0001)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
-losses = qrnn.train(training_data=training_data,
-                    validation_data=validation_data,
-                    maximum_epochs=20,
-		    optimizer=optimizer,
-		    learning_rate_scheduler=scheduler,
-		    gpu=True)
+
 
 
 #
