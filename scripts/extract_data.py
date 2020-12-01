@@ -114,10 +114,8 @@ def process_month(year, month):
     _, output_file = mkstemp()
 
     with sensor_class.create_output_file(output_file) as netcdf_file:
-        for d in tqdm.tqdm(days):
-            files = get_files(data_path, year, month, d)
-
-            input_files = []
+        for day in tqdm.tqdm(days):
+            files = get_files(data_path, year, month, day)
 
             for file in files:
                 input_file = sensor_class(file)
