@@ -9,7 +9,11 @@ def download_data():
     datasets = ["training_data_gmi_small.nc",
                 "training_data_gmi_large.nc",
                 "test_data_gmi_small.nc",
-                "validation_data_gmi_small.nc"]
+                "validation_data_gmi_small.nc",
+                "training_data_mhs_small.nc",
+                "training_data_mhs_large.nc",
+                "test_data_mhs_small.nc",
+                "validation_data_mhs_small.nc"]
     for file in datasets:
         file_path = data_folder / file
         if not file_path.exists():
@@ -19,7 +23,8 @@ def download_data():
 
     model_folder = regn_path / "models"
     model_folder.mkdir(exist_ok=True)
-    models = ["qrnn_gmi.pt"]
+    models = ["qrnn_gmi.pt",
+              "qrnn_mhs.pt"]
     for file in models:
         file_path = model_folder / file
         if not file_path.exists():
