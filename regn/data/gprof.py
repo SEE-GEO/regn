@@ -114,8 +114,9 @@ class GPROFDataset(ABC):
         self.x = self.normalizer(self.x)
 
         self.log_rain_rates = log_rain_rates
-        if log_rain_rates:
-            self.transform_log()
+        self.transform_log()
+        if not log_rain_rates:
+            self.y = np.exp(self.y)
 
         self.rain_threshold = rain_threshold
         if rain_threshold:
