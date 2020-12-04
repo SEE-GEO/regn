@@ -1,9 +1,12 @@
 h5py
 netCDF4
 numpy
+scipy
 pandas
 pyproj
 torch
 tqdm
 xarray
-qrnn
+matplotlib
+quantnn
+docutils

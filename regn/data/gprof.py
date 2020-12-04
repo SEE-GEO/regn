@@ -14,8 +14,6 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import xarray
 import pandas as pd
-import typhon
-import tqdm
 import quantnn.functional as qf
 from pathlib import Path
 
@@ -601,9 +599,8 @@ class MHSDataset(GPROFDataset):
                  normalizer=None,
                  log_rain_rates=False,
                  rain_threshold=None,
-                 normalize=True):
-        self.normalize = normalize
-        self.surface_type = surface_type
+                 normalize=True,
+                 shuffle=True):
         """
         Create instance of the dataset from a given file path.
 
@@ -621,11 +618,14 @@ class MHSDataset(GPROFDataset):
                 output rain rates to turn them into binary non-raining /
                 raining labels.
         """
+        self.normalize = normalize
+        self.surface_type = surface_type
         super().__init__(path,
-                         batch_size,
-                         normalizer,
-                         log_rain_rates,
-                         rain_threshold)
+                         batch_size=batch_size,
+                         normalizer=normalizer,
+                         log_rain_rates=log_rain_rates,
+                         rain_threshold=rain_threshold,
+                         shuffle=shuffle)
 
     def _get_normalizer(self):
         if self.normalize:
@@ -661,8 +661,9 @@ class MHSDataset(GPROFDataset):
         self.y = surface_precipitation.reshape(-1, 1)
 
         valid = surface_type_data > 0
-        valid *= t2m > 0
-        valid *= tcwv > 0
+        print(valid.shape, t2m.shape)
+        valid = valid * t2m > 0
+        valid = valid * (tcwv > 0)
         if self.surface_type > 0:
             valid *= surface_type_data == self.surface_type
         self.valid_samples = valid
