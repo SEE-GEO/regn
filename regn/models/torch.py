@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from quantnn.models.pytorch.common import PytorchModel
 
 class Block(nn.Sequential):
     def __init__(self,
@@ -25,10 +24,10 @@ class Block(nn.Sequential):
             y = torch.cat((y, x[:, n:]), -1)
         return y
 
-class FullyConnected(PytorchModel, nn.Module):
+class FullyConnected(nn.Module):
     def __init__(self,
                  input_features,
-                 quantiles,
+                 output_features,
                  layers,
                  width,
                  activation=nn.ReLU,
@@ -38,8 +37,6 @@ class FullyConnected(PytorchModel, nn.Module):
 
         self.log = log
         self.skip_connections = skip_connections
-        output_features = len(quantiles)
-        PytorchModel.__init__(self, input_features, quantiles)
         nn.Module.__init__(self)
         self.mods = nn.ModuleList([Block(input_features,
                                          width,

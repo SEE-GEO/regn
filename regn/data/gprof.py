@@ -97,7 +97,9 @@ class GPROFDataset(ABC):
                  normalizer=Normalizer,
                  log_rain_rates=False,
                  rain_threshold=None,
-                 shuffle=True):
+                 shuffle=True,
+                 categorical=False,
+                 n_bins=100):
         self.x = None
         self.y = None
         self.shuffle = shuffle
@@ -113,10 +115,16 @@ class GPROFDataset(ABC):
 
         self.x = self.normalizer(self.x)
 
-        self.log_rain_rates = log_rain_rates
-        self.transform_log()
-        if not log_rain_rates:
-            self.y = np.exp(self.y)
+
+        if categorical:
+            self.bins = np.logspace(1e-3, 1e2, n_bins+1)
+            y_cat = np.digitize(self.y, self.bins[:-1])
+            self.y = y_cat
+        else:
+            self.log_rain_rates = log_rain_rates
+            self.transform_log()
+            if not log_rain_rates:
+                self.y = np.exp(self.y)
 
         self.rain_threshold = rain_threshold
         if rain_threshold:
@@ -221,7 +229,8 @@ class GMIDataset(GPROFDataset):
                  rain_threshold=None,
                  shuffle=True,
                  normalize=True,
-                 subsample=1):
+                 subsample=1,
+                 categorical=False):
         """
         Create instance of the dataset from a given file path.
 
@@ -247,7 +256,8 @@ class GMIDataset(GPROFDataset):
                          normalizer,
                          log_rain_rates,
                          rain_threshold,
-                         shuffle)
+                         shuffle,
+                         categorical=categorical)
 
     def _get_normalizer(self):
         if self.normalize:
@@ -601,7 +611,8 @@ class MHSDataset(GPROFDataset):
                  normalizer=None,
                  log_rain_rates=False,
                  rain_threshold=None,
-                 normalize=True):
+                 normalize=True,
+                 categorical=False):
         self.normalize = normalize
         self.surface_type = surface_type
         """
@@ -625,7 +636,8 @@ class MHSDataset(GPROFDataset):
                          batch_size,
                          normalizer,
                          log_rain_rates,
-                         rain_threshold)
+                         rain_threshold,
+                         categorical=categorical)
 
     def _get_normalizer(self):
         if self.normalize:
