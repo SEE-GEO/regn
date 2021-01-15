@@ -110,11 +110,9 @@ optimizer = optim.SGD(model.parameters(), lr=0.001)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
 drnn.train(training_data=training_data,
            validation_data=validation_data,
-           convergence_epochs=0,
-           delta_at=1e-3,
            n_epochs=20,
            optimizer=optimizer,
-           learning_rate_scheduler=scheduler,
+           scheduler=scheduler,
            device="gpu")
 
 

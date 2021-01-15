@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 from regn.data.gprof import MHSDataset, GMIDataset
 from regn.models.torch import FullyConnected
-from quantnn import set_backend, QRNN
+from quantnn import QRNN
 from torch.utils.data import DataLoader
 import torch
 from torch import nn
@@ -75,7 +75,6 @@ validation_data = DataLoader(validation_data, batch_size=None, num_workers=4, pi
 # Create model
 #
 
-set_backend("pytorch")
 quantiles = np.array([0.01, 0.05, 0.15, 0.25, 0.35, 0.45, 0.5, 0.55, 0.65, 0.75, 0.85, 0.95, 0.99])
 model = FullyConnected(training_data.dataset.input_features,
                        quantiles.size,
@@ -86,39 +85,33 @@ model = FullyConnected(training_data.dataset.input_features,
                        skip_connections=skip_connections)
 model.quantiles = quantiles
 model.backend = "quantnn.models.pytorch"
-qrnn = QRNN(training_data.dataset.quantiles, model=model)
+qrnn = QRNN(quantiles, model=model)
 
 optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
 qrnn.train(training_data=training_data,
            validation_data=validation_data,
-           convergence_epochs=0,
-           delta_at=1e-3,
-           maximum_epochs=20,
+           n_epochs=20,
            optimizer=optimizer,
-           learning_rate_scheduler=scheduler,
-           gpu=True)
+           scheduler=scheduler,
+           device="gpu")
 
 optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
 qrnn.train(training_data=training_data,
            validation_data=validation_data,
-           convergence_epochs=0,
-           delta_at=1e-3,
-           maximum_epochs=20,
+           n_epochs=20,
            optimizer=optimizer,
-           learning_rate_scheduler=scheduler,
-           gpu=True)
+           scheduler=scheduler,
+           device="gpu")
 optimizer = optim.SGD(model.parameters(), lr=0.001)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
 qrnn.train(training_data=training_data,
            validation_data=validation_data,
-           convergence_epochs=0,
-           delta_at=1e-3,
-           maximum_epochs=20,
+           n_epochs=20,
            optimizer=optimizer,
-           learning_rate_scheduler=scheduler,
-           gpu=True)
+           scheduler=scheduler,
+           device="gpu")
 
 
 
