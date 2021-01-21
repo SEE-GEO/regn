@@ -16,6 +16,9 @@ setup(
     author_email='simon.pfreundschuh@chalmers.se',  # Optional
     install_requires=[
         "tqdm>=4.48",
+        "tqdm",
+        "numpy",
+        "netCDF4"
     ],
     packages=["regn"],
     python_requires='>=3.6',

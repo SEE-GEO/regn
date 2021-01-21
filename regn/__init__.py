@@ -31,5 +31,3 @@ def download_data():
             print(f"Downloading file {file}.")
             url = f"http://spfrnd.de/data/regn/{file}"
             urlretrieve(url, file_path)
-
-download_data()

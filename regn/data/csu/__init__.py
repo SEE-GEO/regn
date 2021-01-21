@@ -7,13 +7,17 @@ This module contains function to read CSU .bin data for GPROF v. 7.
 """
 import asyncio
 import contextlib
-import tqdm.asyncio
+import logging
+import multiprocessing
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor
 import re
 
 from netCDF4 import Dataset
 import numpy as np
+import tqdm.asyncio
+
+LOGGER = logging.getLogger(__name__)
 
 N_LAYERS = 28
 N_FREQS = 15
@@ -33,7 +37,7 @@ GMI_BIN_RECORD_TYPES = np.dtype(
      ("delta_tb", [(f"tb_{i:02}", np.float32) for i in range(N_FREQS)]),
      ("rain_water_path", np.float32),
      ("cloud_water_path", np.float32),
-     ("integrated_water_vapor", np.float32),
+     ("ice_water_path", np.float32),
      ("total_column_water_vapor", np.float32),
      ("two_meter_temperature", np.float32),
      ("rain_water_content", [(f"l_{i:02}", np.float32) for i in range(N_LAYERS)]),
@@ -187,6 +191,8 @@ class GPROFGMIOutputFile:
         """
         self.filename = filename
         Dataset(filename, "w").close()
+        manager = multiprocessing.Manager()
+        self.lock = manager.Lock()
 
     @property
     def handle(self):
@@ -234,16 +240,25 @@ class GPROFGMIOutputFile:
             data: Dictionary containing variable names and data
                 to add to store in the output file.
         """
-        with self.handle as handle:
-            if len(handle.variables) == 0:
-                self._initialize_file(data, handle)
+        with self.lock:
+            with self.handle as handle:
+                if len(handle.variables) == 0:
+                    self._initialize_file(data, handle)
 
-            i = handle.dimensions["samples"].size
-            for k in data:
-                v = handle.variables[k]
-                d = data[k]
-                n = d.shape[0]
-                v[i:i + n] = d
+                n = 0
+                for k in data:
+                    n = max(data[k].shape[0], n)
+                    if data[k].shape[0] == 0:
+                        return
+
+                i = handle.dimensions["samples"].size
+                for k in data:
+                    v = handle.variables[k]
+                    d = data[k]
+                    if d.size == 1:
+                        v[i:i + n] = d[0]
+                    else:
+                        v[i:i + n] = d
 
     def __repr__(self):
         return (f"GPROFGMIOutputFile(filename={self.filename})")
@@ -254,6 +269,13 @@ class GPROFGMIOutputFile:
 
 GPM_FILE_REGEXP = re.compile("gpm_(\d\d\d)_(\d\d)(_(\d\d))?_(\d\d).bin")
 
+
+def _process_input(input_filename,
+                   output_file,
+                   start=1.0,
+                   end=1.0):
+    data = load_data(input_filename, start, end)
+    output_file.add_data(data)
 
 async def process_input(loop,
                         pool,
@@ -274,9 +296,7 @@ async def process_input(loop,
         start: Fractional position from which to start reading the data.
         end: Fractional position up to which to read the data.
     """
-    data = await loop.run_in_executor(pool, load_data, input_filename, start, end)
-    async with output_file_lock:
-        await loop.run_in_executor(pool, output_file.add_data, data)
+    await loop.run_in_executor(pool, _process_input, input_filename, output_file, start, end)
 
 
 class FileProcessor:
@@ -354,3 +374,64 @@ class FileProcessor:
 
         loop.run_until_complete(coro())
         loop.close()
+
+
+###############################################################################
+# Dataset interface.
+###############################################################################
+
+
+class GPROFDataset:
+    """
+    Dataset interface to load GPROF data from NetCDF file.
+    """
+    def __init__(self,
+                 filename,
+                 target="surface_precip"):
+        self.filename = filename
+        self.target = target
+        self._load_data()
+
+
+    def _load_data(self):
+        with Dataset(self.filename, "r") as dataset:
+
+            LOGGER.info("Loading data from file: %s",
+                        self.filename)
+
+            variables = dataset.variables
+            n = dataset.dimensions["samples"].size
+
+            #
+            # Input data
+            #
+
+            # Brightness temperatures
+            bts = variables["brightness_temps"][:]
+            LOGGER.info("Loaded %n brightness temperatures.", n)
+
+            # 2m temperature
+            t2m = variables["two_meter_temperature"][:].reshape(-1, 1)
+            # Total precitable water.
+            tcwv = variables["total_column_water_vapor"][:].reshape(-1, 1)
+            # Surface type
+            st = variables["surface_type"][:]
+            n_types = 19
+            st_1h = np.zeros((n, n_types), dtype=np.float32)
+            st_1h[np.arange(n), st.ravel()] = 1.0
+            # Airmass type
+            am = variables["airmass_type"][:]
+            n_types = 4
+            am_1h = np.zeros((n, n_types), dtype=np.float32)
+            am_1h[np.arange(n), am.ravel()] = 1.0
+
+            self.x = np.concatenate([bts, t2m, tcwv, st_1h, am_1h], axis=1)
+
+            #
+            # Output data
+            #
+
+            self.y = variables[self.target][:]
+
+
+
