@@ -15,7 +15,7 @@ setup(
     author='Simon Pfreundschuh, Inderpreet Kaur, Patrick Eriksson',  # Optional
     author_email='simon.pfreundschuh@chalmers.se',  # Optional
     install_requires=[
-        "tqdm",
+        "tqdm>=4.48",
     ],
     packages=["regn"],
     python_requires='>=3.6',
