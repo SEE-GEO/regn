@@ -189,6 +189,7 @@ class GPROFGMIOutputFile:
         """
         Create a new output file with the given name.
         """
+        print("Createin output file: ", filename)
         self.filename = filename
         Dataset(filename, "w").close()
         manager = multiprocessing.Manager()
@@ -267,7 +268,7 @@ class GPROFGMIOutputFile:
 # File processor.
 ###############################################################################
 
-GPM_FILE_REGEXP = re.compile("gpm_(\d\d\d)_(\d\d)(_(\d\d))?_(\d\d).bin")
+GPM_FILE_REGEXP = re.compile(r"gpm_(\d\d\d)_(\d\d)(_(\d\d))?_(\d\d).bin")
 
 
 def _process_input(input_filename,
@@ -281,7 +282,6 @@ async def process_input(loop,
                         pool,
                         input_filename,
                         output_file,
-                        output_file_lock,
                         start=0.0,
                         end=1.0):
     """
@@ -356,7 +356,6 @@ class FileProcessor:
         loop = asyncio.new_event_loop()
 
         output_file = GPROFGMIOutputFile(output_file)
-        output_file_lock = asyncio.Lock(loop=loop)
         input_file = GPROFGMIBinFile(self.files[0])
         output_file.add_attributes(input_file.get_attributes())
 
@@ -365,7 +364,6 @@ class FileProcessor:
                                    pool,
                                    f,
                                    output_file,
-                                   output_file_lock,
                                    start=start_fraction,
                                    end=end_fraction)
                      for f in self.files]
