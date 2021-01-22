@@ -4,9 +4,11 @@ Test data extraction of new GPROF GMI database.
 from pathlib import Path
 
 import numpy as np
-from regn.data.csu import (FileProcessor,
-                           GPROFGMIBinFile,
-                           GPROFDataset)
+from regn.data.csu.bin import (FileProcessor,
+                               GPROFGMIBinFile)
+from regn.data.csu.training_data import GPROFDataset
+from netCDF4 import Dataset
+
 
 
 def test_file_processor(tmp_path):
@@ -21,7 +23,8 @@ def test_file_processor(tmp_path):
 
     input_file = GPROFGMIBinFile(path / "data"/ "gpm_300_40_00_18.bin")
 
-    dataset = GPROFDataset(output_file)
+    dataset = GPROFDataset(output_file, normalize=False)
+    normalizer = dataset.normalizer
 
     assert np.all(np.isclose(input_file.handle["brightness_temps"].view("15f4"),
                              dataset.x[:, :15]))
