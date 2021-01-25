@@ -7,6 +7,10 @@ import numpy as np
 from regn.data.csu.bin import (FileProcessor,
                                GPROFGMIBinFile)
 from regn.data.csu.training_data import GPROFDataset
+from regn.data.csu.retrieval import (ORBIT_HEADER_TYPES,
+                                     PROFILE_INFO_TYPES,
+                                     SCAN_HEADER_TYPES,
+                                     DATA_RECORD_TYPES)
 from netCDF4 import Dataset
 
 
@@ -39,3 +43,14 @@ def test_file_processor(tmp_path):
     airmass_types = np.where(dataset.x[:, 36:])[1]
     assert np.all(np.isclose(input_file.airmass_type,
                              airmass_types))
+
+
+def test_retrieval_file_types():
+    """
+    Ensure that struct type defintions match the expected sizes.
+    """
+    assert ORBIT_HEADER_TYPES.itemsize == 400
+    assert PROFILE_INFO_TYPES.itemsize == 537864
+    assert SCAN_HEADER_TYPES.itemsize == 28
+    assert DATA_RECORD_TYPES.itemsize == 88
+

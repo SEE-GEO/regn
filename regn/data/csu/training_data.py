@@ -105,6 +105,9 @@ class GPROFDataset:
                 bts[index_start: index_end, :] = v[index_start: index_end, :].data
                 index_start += chunk_size
 
+            invalid = (bts > 500.0) * (bts < 0.0)
+            bts[invalid] = -1.0
+
             LOGGER.info("Loaded %n brightness temperatures.", n)
 
             # 2m temperature
