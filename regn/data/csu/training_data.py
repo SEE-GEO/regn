@@ -68,6 +68,9 @@ class GPROFDataset:
         self.x = self.x.astype(np.float32)
         self.y = self.y.astype(np.float32)
 
+        self._shuffled = False
+        if self.shuffle:
+            self._shuffle()
 
 
     def _transform_zero_rain(self):
@@ -133,6 +136,14 @@ class GPROFDataset:
 
             self.y = variables[self.target][:]
 
+    def _shuffle(self):
+        if not self._shuffled:
+            indices = np.random.permutation(self.x.shape[0])
+            self.x = self.x[indices, :]
+            self.y = self.y[indices]
+            self._shuffled = True
+
+
     def __getitem__(self, i):
         """
         Return element from the dataset. This is part of the
@@ -142,10 +153,9 @@ class GPROFDataset:
             i(int): The index of the sample to return
         """
         if self.shuffle and i == 0:
-            indices = np.random.permutation(self.x.shape[0])
-            self.x = self.x[indices, :]
-            self.y = self.y[indices]
+            self._shuffle()
 
+        self._shuffled = False
         if self.batch_size is None:
             return (torch.tensor(self.x[[i], :]),
                     torch.tensor(self.y[[i]]))

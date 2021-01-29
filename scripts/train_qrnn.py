@@ -5,6 +5,8 @@ import numpy as np
 from regn.data.csu.training_data import GPROFDataset
 from regn.models.torch import FullyConnected
 from quantnn import QRNN
+from quantnn.data import SFTPStream
+from quantnn.normalizer import Normalizer
 import torch
 from torch.utils.data import DataLoader
 from torch import nn
@@ -54,21 +56,27 @@ results_name = f"qrnn_{sensor}_{n_layers}_{n_neurons}_relu_{batch_norm}_{skip_co
 # Load the data.
 #
 
-data_class = GPROFDataset
-training_data = GPROFDataset(training_data,
-                             batch_size=512)
-validation_data = GPROFDataset(validation_data,
-                               normalizer=training_data.normalizer,
-                               batch_size=512)
-training_data = DataLoader(training_data, batch_size=None, num_workers=4, pin_memory=True)
-validation_data = DataLoader(validation_data, batch_size=None, num_workers=4, pin_memory=True)
+host = "129.16.35.202"
+training_path = "array1/share/Datasets/gprof/simple/training_data"
+validation_path = "array1/share/Datasets/gprof/simple/validation_data"
+dataset_factory = GPROFDataset
+
+normalizer = Normalizer.load("sftp://129.16.35.202/mnt/array1/share/Datasets/gprof/simple/gprof_gmi_normalizer.pckl")
+print(normalizer.means)
+kwargs = {"batch_size": 512,
+          "normalizer": normalizer}
+
+training_data = SFTPStream(host, training_path, dataset_factory, kwargs=kwargs)
+validation_data = SFTPStream(host, validation_path, dataset_factory, kwargs=kwargs)
+#training_data = DataLoader(training_data, batch_size=None, num_workers=1, pin_memory=True)
+#validation_data = DataLoader(validation_data, batch_size=None, num_workers=1, pin_memory=True)
 
 #
 # Create model
 #
 
 quantiles = np.linspace(0.01, 0.99, 99)
-model = FullyConnected(training_data.dataset.x.shape[1],
+model = FullyConnected(40,
                        quantiles.size,
                        n_layers,
                        n_neurons,
@@ -77,28 +85,30 @@ model = FullyConnected(training_data.dataset.x.shape[1],
                        skip_connections=skip_connections)
 qrnn = QRNN(quantiles, model=model)
 
+n_epochs=10
 optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 10)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
 qrnn.train(training_data=training_data,
            validation_data=validation_data,
-           n_epochs=10,
+           n_epochs=n_epochs,
            optimizer=optimizer,
            scheduler=scheduler,
            device="gpu")
+qrnn.save(model_path / network_name)
 
 optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 10)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
 qrnn.train(training_data=training_data,
            validation_data=validation_data,
-           n_epochs=10,
+           n_epochs=n_epochs,
            optimizer=optimizer,
            scheduler=scheduler,
            device="gpu")
 optimizer = optim.SGD(model.parameters(), lr=0.001)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 10)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
 losses = qrnn.train(training_data=training_data,
                     validation_data=validation_data,
-                    n_epochs=10,
+                    n_epochs=n_epochs,
                     optimizer=optimizer,
                     scheduler=scheduler,
                     device="gpu")

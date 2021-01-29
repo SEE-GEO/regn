@@ -14,7 +14,6 @@ from regn.data.csu.retrieval import (ORBIT_HEADER_TYPES,
 from netCDF4 import Dataset
 
 
-
 def test_file_processor(tmp_path):
     """
     This tests the extraction of data from a bin file and ensures that

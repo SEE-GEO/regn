@@ -22,6 +22,7 @@ class InputData(Dataset):
                  filename,
                  normalizer,
                  scans_per_batch=4):
+        self.filename = filename
         self.data = PreprocessorFile(filename).to_xarray_dataset()
         self.normalizer = normalizer
 
@@ -72,8 +73,13 @@ class InputData(Dataset):
 
     def run_retrieval(self, qrnn):
         quantiles = qrnn.quantiles
+
         y_pred = np.zeros((self.n_scans, self.n_pixels, len(quantiles)))
         mean = np.zeros((self.n_scans, self.n_pixels))
+        first_tertial = np.zeros((self.n_scans, self.n_pixels))
+        second_tertial = np.zeros((self.n_scans, self.n_pixels))
+        pop = np.zeros((self.n_scans, self.n_pixels))
+
         for i in range(len(self)):
             x = self[i]
             y = qrnn.predict(x)
@@ -81,15 +87,35 @@ class InputData(Dataset):
             i_start = i * self.scans_per_batch
             i_end = (i + 1) * self.scans_per_batch
             y_pred[i_start:i_end, :, :] = y.reshape(-1, self.n_pixels, len(quantiles))
+
             means = qq.posterior_mean(y, quantiles, quantile_axis=1)
             mean[i_start:i_end] = means.reshape(-1, self.n_pixels)
 
-        dims = ["n_scans", "n_pixels", "n_quantiles"]
+            t = qq.posterior_quantiles(y, quantiles, [0.333], quantile_axis=1)
+            first_tertial[i_start:i_end] = t.reshape(-1, self.n_pixels)
+            t = qq.posterior_quantiles(y, quantiles, [0.666], quantile_axis=1)
+            second_tertial[i_start:i_end] = t.reshape(-1, self.n_pixels)
 
-        data = {"predicted_quantiles": (dims, y_pred),
-                "posterior_mean": (dims[:2], mean)}
+            p =  qq.probability_larger_than(y, quantiles, 0.01, quantile_axis=1)
+            pop[i_start:i_end] = p.reshape(-1, self.n_pixels)
 
+
+        dims = ["scans", "pixels", "quantiles"]
+
+        data = {
+            "quantiles": (("quantiles",), quantiles),
+            "precip_quantiles": (dims, y_pred),
+            "precip_mean": (dims[:2], mean),
+            "precip_1st_tertial": (dims[:2], first_tertial),
+            "precip_3rd_tertial": (dims[:2], second_tertial),
+            "precip_pop": (dims[:2], pop)
+        }
         return xarray.Dataset(data)
+
+    def write_retrieval_results(self, path, results):
+        preprocessor_file = PreprocessorFile(self.filename)
+        preprocessor_file.write_retrieval_results(path, results)
+
 
     def __len__(self):
         return self.n_batches
