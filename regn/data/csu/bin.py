@@ -3,7 +3,7 @@
 regn.data.csu.bin
 =================
 
-This module contains function to read and convert CSU .bin data for GPROF
+This module contains functions to read and convert CSU .bin data for GPROF
  v. 7.
 """
 import asyncio

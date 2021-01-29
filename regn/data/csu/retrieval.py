@@ -68,7 +68,7 @@ SCAN_HEADER_TYPES = np.dtype(
     [("scan_latitude", "f4"),
      ("scan_longitude", "f4"),
      ("scan_altitude", "f4"),
-     ("scan_data", DATE7_TYPE),
+     ("scan_date", DATE7_TYPE),
      ("spare", "i2")])
 
 DATA_RECORD_TYPES = np.dtype(
@@ -96,13 +96,12 @@ DATA_RECORD_TYPES = np.dtype(
 
      ("most_likely_precip", "f4"),
      ("precip_1st_tertial", "f4"),
-     ("precip_2nd_tertial", "f4"),
+     ("precip_3rd_tertial", "f4"),
      ("profile_t2m_index", "i2"),
      ("profile_number", f"{N_SPECIES}i2"),
      ("profile_scale", f"{N_SPECIES}f4")
      ]
 )
-
 
 class RetrievalFile:
     """
@@ -123,6 +122,33 @@ class RetrievalFile:
         np.random.seed(self.orbit_header["granule_number"])
         self.scan_indices = np.random.permutation(np.arange(self.n_scans))
         self.pixel_indices = np.random.permutation(np.arange(self.n_pixels))
+
+
+    @staticmethod
+    def write(path, retrieval_results):
+        path = Path(path)
+        filename = path / _get_filename(results)
+
+
+        with open(filename, "rb"):
+
+            orbit_header = retrieval_results["header"]
+            orbit_header["satellite"] = retrieval_results["satellite"]
+            orbit_header["sensor"] = retrieval_results["sensor"]
+            orbit_header["preprocessor"] = retrieval_results["preprocessor"]
+            orbit_header["algorithm"] = "QPROF"
+            orbit_header["profile_database_file"] = retrieval_results["profile_database"]
+            orbit_header["radiometer_file"] = retrieval_results["radiometer_file"]
+            orbit_header["creation_date"] = retrieval_results["creation_date"]
+            orbit_header["granule_start_date"] = retrieval_results["start_date"]
+            orbit_header["granule_end_date"] = retrieval_results["end_date"]
+
+
+
+
+            orbit_header["sensor"]
+
+
 
 
     @property
@@ -154,6 +180,26 @@ class RetrievalFile:
         return np.frombuffer(self.data,
                              DATA_RECORD_TYPES,
                              count=self.n_pixels,
+                             offset=offset)
+
+    def get_scan_header(self, i):
+        """
+        Args:
+            i: The index of the scan to return.
+
+        Returns:
+            The header of the ith scan in the file as numpy structured array
+            of size n_pixels and dtype DATA_RECORD_TYPES.
+        """
+        if i < 0:
+            i = self.n_scans + i
+
+        offset = ORBIT_HEADER_TYPES.itemsize + PROFILE_INFO_TYPES.itemsize
+        offset += i * (SCAN_HEADER_TYPES.itemsize
+                       + self.n_pixels * DATA_RECORD_TYPES.itemsize)
+        return np.frombuffer(self.data,
+                             SCAN_HEADER_TYPES,
+                             count=1,
                              offset=offset)
 
     def to_xarray_dataset(self):
