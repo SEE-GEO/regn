@@ -39,7 +39,7 @@ class FullyConnected(nn.Module):
         self.skip_connections = skip_connections
         nn.Module.__init__(self)
         self.mods = nn.ModuleList([Block(input_features,
-                                         width,
+                                         width - input_features,
                                          activation,
                                          skip_connections=False,
                                          batch_norm=batch_norm)])
@@ -63,4 +63,55 @@ class FullyConnected(nn.Module):
             y = l.forward(y)
         if self.log:
             y = torch.exp(y)
+        return y
+
+class FullyConnectedWithSkips(nn.Module):
+    def __init__(self,
+                 input_features,
+                 output_features,
+                 layers,
+                 width,
+                 activation=nn.ReLU,
+                 log=False,
+                 batch_norm=True):
+        nn.Module.__init__(self)
+
+        n_out = (width - input_features) // 2
+        n_in = 2 * n_out + input_features
+
+        self.mods = nn.ModuleList([Block(input_features,
+                                         n_out,
+                                         activation,
+                                         skip_connections=False,
+                                         batch_norm=batch_norm)])
+        self.mods.append(Block(n_out + input_features,
+                               n_out,
+                               activation,
+                               skip_connections=False,
+                               batch_norm=batch_norm))
+        for i in range(layers - 1):
+            self.mods.append(Block(n_in,
+                                   n_out,
+                                   activation,
+                                   skip_connections=False,
+                                   batch_norm=batch_norm))
+
+        self.mods.append(nn.Linear(n_in,
+                                   output_features))
+
+    def forward(self, x):
+
+
+        l = self.mods[0]
+        ly = l(x)
+        y = torch.cat([ly, x], -1)
+
+        ly_p = ly
+
+
+        for l in self.mods[1:-1]:
+            ly = l(y)
+            y = torch.cat([ly, ly_p, x], -1)
+
+        y = self.mods[-1](y)
         return y

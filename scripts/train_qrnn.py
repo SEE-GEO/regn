@@ -3,7 +3,7 @@ from pathlib import Path
 
 import numpy as np
 from regn.data.csu.training_data import GPROFDataset
-from regn.models.torch import FullyConnected
+from regn.models.torch import FullyConnectedWithSkips
 from quantnn import QRNN
 from quantnn.data import SFTPStream
 from quantnn.normalizer import Normalizer
@@ -49,8 +49,8 @@ model_path.mkdir(parents=False, exist_ok=True)
 n_layers = args.n_layers[0]
 n_neurons = args.n_neurons[0]
 
-network_name = f"qrnn_{sensor}_{n_layers}_{n_neurons}_relu_{batch_norm}_{skip_connections}.pt"
-results_name = f"qrnn_{sensor}_{n_layers}_{n_neurons}_relu_{batch_norm}_{skip_connections}.dat"
+network_name = f"qrnn_{sensor}_{n_layers}_{n_neurons}_relu.pt"
+results_name = f"qrnn_{sensor}_{n_layers}_{n_neurons}_relu.dat"
 
 #
 # Load the data.
@@ -76,13 +76,11 @@ validation_data = SFTPStream(host, validation_path, dataset_factory, kwargs=kwar
 #
 
 quantiles = np.linspace(0.01, 0.99, 99)
-model = FullyConnected(40,
-                       quantiles.size,
+model = FullyConnectedWithSkips(40,
+        quantiles.size,
                        n_layers,
                        n_neurons,
-                       batch_norm=batch_norm,
-                       log=False,
-                       skip_connections=skip_connections)
+                       batch_norm=batch_norm)
 qrnn = QRNN(quantiles, model=model)
 
 n_epochs=10
