@@ -107,6 +107,9 @@ class GPROFGMIBinFile:
                                   offset=GMI_BIN_HEADER_TYPES.itemsize)
         self.n_profiles = self.handle.shape[0]
 
+        np.random.seed([self.temperature, self.tpw, self.surface_type, self.airmass_type])
+        self.indices = np.random.permuation(self.n_profiles)
+
     def get_attributes(self):
         """
         Return file header as dictionary of attributes.
@@ -134,6 +137,7 @@ class GPROFGMIBinFile:
         """
         n_start = int(start * self.n_profiles)
         n_end = int(end * self.n_profiles)
+        indices = self.indices[n_start:n_end]
 
         results = {}
         for k, t in GMI_BIN_RECORD_TYPES.descr:
@@ -142,10 +146,10 @@ class GPROFGMIBinFile:
                 continue
             if type(t) is str:
                 view = self.handle[k].view(t)
-                results[k] = view[n_start:n_end]
+                results[k] = view[indices]
             else:
                 view = self.handle[k].view(f"{len(t)}{t[0][1]}")
-                results[k] = view[n_start:n_end]
+                results[k] = view[indices]
         results["surface_type"] = self.surface_type * np.ones(1, dtype=np.int)
         results["airmass_type"] = self.airmass_type * np.ones(1, dtype=np.int)
         results["tpw"] = self.tpw * np.ones(1, dtype=np.float)

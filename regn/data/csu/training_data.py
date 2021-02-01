@@ -12,6 +12,7 @@ from netCDF4 import Dataset
 import numpy as np
 import torch
 from quantnn.normalizer import Normalizer
+import quantnn.quantiles as qq
 
 class GPROFDataset:
     """
@@ -79,7 +80,7 @@ class GPROFDataset:
         the range [1e-6, 1e-4], which helps to stabilize training of QRNNs.
         """
         indices = self.y < 1e-4
-        self.y[indices] = 10.0 ** np.random.uniform(-6, -4, indices.sum())
+        self.y[indices] = np.random.uniform(1e-6, 1e-4, indices.sum())
 
     def _load_data(self):
         """
@@ -152,8 +153,6 @@ class GPROFDataset:
         Args:
             i(int): The index of the sample to return
         """
-        if self.shuffle and i == 0:
-            self._shuffle()
 
         self._shuffled = False
         if self.batch_size is None:
@@ -162,6 +161,12 @@ class GPROFDataset:
 
         i_start = self.batch_size * i
         i_end = self.batch_size * (i + 1)
+
+        if i + 1 == len(self):
+            print("shufflin' ...")
+            self._shuffle()
+            self._transform_zero_rain()
+
         if i >= len(self):
             raise IndexError()
         return (torch.tensor(self.x[i_start:i_end, :]),
@@ -173,8 +178,60 @@ class GPROFDataset:
         """
         if self.batch_size:
             n = self.x.shape[0] // self.batch_size
-            if (self.x.shape[0] % self.batch_size) > 0:
-                n += 1
             return n
         else:
             return self.x.shape[0]
+
+    def evaluate(self, qrnn, batch_size=1024):
+        """
+        Run retrieval on dataset.
+        """
+        n_samples = self.x.shape[0]
+        quantiles = qrnn.quantiles
+        y_quantiles = np.zeros((n_samples, len(quantiles)))
+        y_mean = np.zeros(n_samples)
+        y_median = np.zeros(n_samples)
+        dy_mean = np.zeros(n_samples)
+        dy_median = np.zeros(n_samples)
+        pop = np.zeros(n_samples)
+        y_true = np.zeros(n_samples)
+        calibration = np.zeros(len(qrnn.quantiles))
+
+        i_start = 0
+        while (i_start < n_samples):
+
+            i_end = i_start + batch_size
+            x = torch.tensor(self.x[i_start:i_end]).float().detach()
+            y = torch.tensor(self.y[i_start:i_end]).float().detach()
+
+            y_pred = qrnn.model(x).detach().numpy()
+            y_quantiles[i_start:i_end] = y_pred
+            y_mean[i_start:i_end] = qq.posterior_mean(
+                y_pred, qrnn.quantiles).ravel()
+            y_median[i_start:i_end] = qq.posterior_quantiles(
+                y_pred, quantiles, [0.5]).ravel()
+            dy_mean[i_start:i_end] = y_mean[i_start:i_end] - y.numpy()
+            dy_median[i_start:i_end] = y_median[i_start:i_end] - y.numpy()
+
+            pop[i_start:i_end] = qq.probability_larger_than(
+                y_pred, qrnn.quantiles, 1e-2)
+
+            y_true[i_start:i_end] = y.numpy()
+
+            calibration += np.sum(y.numpy().reshape(-1, 1) <= y_pred, axis=0)
+
+            i_start = i_end
+
+        calibration /= n_samples
+
+        results = {"y_quantiles": y_quantiles,
+                   "y_mean": y_mean,
+                   "dy_mean": dy_mean,
+                   "y_median": y_median,
+                   "dy_median": dy_median,
+                   "pop": pop,
+                   "y_true": y_true,
+                   "calibration": calibration}
+        return results
+
+

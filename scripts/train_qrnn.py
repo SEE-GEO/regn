@@ -66,8 +66,8 @@ print(normalizer.means)
 kwargs = {"batch_size": 512,
           "normalizer": normalizer}
 
-training_data = SFTPStream(host, training_path, dataset_factory, kwargs=kwargs)
-validation_data = SFTPStream(host, validation_path, dataset_factory, kwargs=kwargs)
+training_data = SFTPStream(host, training_path, dataset_factory, kwargs=kwargs, n_workers=5, n_files=1)
+validation_data = SFTPStream(host, validation_path, dataset_factory, kwargs=kwargs, n_workers=1)
 #training_data = DataLoader(training_data, batch_size=None, num_workers=1, pin_memory=True)
 #validation_data = DataLoader(validation_data, batch_size=None, num_workers=1, pin_memory=True)
 
@@ -84,7 +84,7 @@ model = FullyConnectedWithSkips(40,
 qrnn = QRNN(quantiles, model=model)
 
 n_epochs=10
-optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=0.5e-5)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
 qrnn.train(training_data=training_data,
            validation_data=validation_data,
