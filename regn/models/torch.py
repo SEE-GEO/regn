@@ -6,7 +6,7 @@ class Block(nn.Sequential):
                  in_features,
                  out_features,
                  activation,
-                 skip_connections=True,
+                 skip_connections=False,
                  batch_norm=True):
         self.skip_connections = skip_connections
         if self.skip_connections:
@@ -32,7 +32,7 @@ class FullyConnected(nn.Module):
                  width,
                  activation=nn.ReLU,
                  log=False,
-                 skip_connections=True,
+                 skip_connections=False,
                  batch_norm=True):
 
         self.log = log

@@ -80,7 +80,7 @@ class GPROFDataset:
         the range [1e-6, 1e-4], which helps to stabilize training of QRNNs.
         """
         indices = self.y < 1e-4
-        self.y[indices] = np.random.uniform(1e-6, 1e-4, indices.sum())
+        self.y[indices] = np.random.uniform(1e-6, 1.0e-4, indices.sum())
 
     def _load_data(self):
         """
@@ -188,7 +188,6 @@ class GPROFDataset:
         """
         n_samples = self.x.shape[0]
         quantiles = qrnn.quantiles
-        y_quantiles = np.zeros((n_samples, len(quantiles)))
         y_mean = np.zeros(n_samples)
         y_median = np.zeros(n_samples)
         dy_mean = np.zeros(n_samples)
@@ -205,7 +204,6 @@ class GPROFDataset:
             y = torch.tensor(self.y[i_start:i_end]).float().detach()
 
             y_pred = qrnn.model(x).detach().numpy()
-            y_quantiles[i_start:i_end] = y_pred
             y_mean[i_start:i_end] = qq.posterior_mean(
                 y_pred, qrnn.quantiles).ravel()
             y_median[i_start:i_end] = qq.posterior_quantiles(
@@ -224,8 +222,7 @@ class GPROFDataset:
 
         calibration /= n_samples
 
-        results = {"y_quantiles": y_quantiles,
-                   "y_mean": y_mean,
+        results = {"y_mean": y_mean,
                    "dy_mean": dy_mean,
                    "y_median": y_median,
                    "dy_median": dy_median,
