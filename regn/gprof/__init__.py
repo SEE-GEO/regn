@@ -124,8 +124,3 @@ class InputData(Dataset):
         if i > self.n_batches:
             raise IndexError()
         return self.get_batch(i)
-
-
-
-
-

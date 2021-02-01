@@ -3,7 +3,7 @@ from pathlib import Path
 
 import numpy as np
 from regn.data.csu.training_data import GPROFDataset
-from regn.models.torch import FullyConnectedWithSkips
+from regn.models.torch import FullyConnected
 from quantnn import QRNN
 from quantnn.data import SFTPStream
 from quantnn.normalizer import Normalizer
@@ -76,7 +76,7 @@ validation_data = SFTPStream(host, validation_path, dataset_factory, kwargs=kwar
 #
 
 quantiles = np.linspace(0.01, 0.99, 99)
-model = FullyConnectedWithSkips(40,
+model = FullyConnected(40,
         quantiles.size,
                        n_layers,
                        n_neurons,
