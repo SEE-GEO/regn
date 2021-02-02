@@ -39,7 +39,7 @@ class FullyConnected(nn.Module):
         self.skip_connections = skip_connections
         nn.Module.__init__(self)
         self.mods = nn.ModuleList([Block(input_features,
-                                         width - input_features,
+                                         width,
                                          activation,
                                          skip_connections=False,
                                          batch_norm=batch_norm)])
