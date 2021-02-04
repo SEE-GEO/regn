@@ -67,10 +67,12 @@ dataset_factory = GPROFDataset
 
 normalizer = Normalizer.load("sftp://129.16.35.202/mnt/array1/share/Datasets/gprof/simple/gprof_gmi_normalizer.pckl")
 print(normalizer.means)
+bins = np.logspace(-3, 2, 257)
 kwargs = {"batch_size": 512,
-          "normalizer": normalizer}
+          "normalizer": normalizer,
+          "bins": bins}
 
-training_data = SFTPStream(host, training_path, dataset_factory, kwargs=kwargs, n_workers=5)
+training_data = SFTPStream(host, training_path, dataset_factory, kwargs=kwargs, n_workers=5, n_files=1)
 validation_data = SFTPStream(host, validation_path, dataset_factory, kwargs=kwargs, n_workers=1)
 #training_data = DataLoader(training_data, batch_size=None, num_workers=1, pin_memory=True)
 #validation_data = DataLoader(validation_data, batch_size=None, num_workers=1, pin_memory=True)
@@ -79,7 +81,6 @@ validation_data = SFTPStream(host, validation_path, dataset_factory, kwargs=kwar
 # Create model
 #
 
-bins = np.logspace(-3, 2, 257)
 model = FullyConnected(40,
                        bins.size - 1,
                        n_layers,

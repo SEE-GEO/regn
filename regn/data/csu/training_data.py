@@ -12,7 +12,9 @@ from netCDF4 import Dataset
 import numpy as np
 import torch
 from quantnn.normalizer import Normalizer
+from quantnn.drnn import _to_categorical
 import quantnn.quantiles as qq
+import xarray
 
 class GPROFDataset:
     """
@@ -35,7 +37,8 @@ class GPROFDataset:
                  transform_zero_rain=True,
                  batch_size=None,
                  normalizer=None,
-                 shuffle=True):
+                 shuffle=True,
+                 bins=None):
         """
         Create GPROF dataset.
 
@@ -68,6 +71,12 @@ class GPROFDataset:
 
         self.x = self.x.astype(np.float32)
         self.y = self.y.astype(np.float32)
+
+        if bins is not None:
+            self.binned = True
+            self.y = _to_categorical(self.y, bins)
+        else:
+            self.binned = False
 
         self._shuffled = False
         if self.shuffle:
@@ -165,7 +174,8 @@ class GPROFDataset:
         if i + 1 == len(self):
             print("shufflin' ...")
             self._shuffle()
-            self._transform_zero_rain()
+            if not self.binned:
+                self._transform_zero_rain()
 
         if i >= len(self):
             raise IndexError()
@@ -182,7 +192,9 @@ class GPROFDataset:
         else:
             return self.x.shape[0]
 
-    def evaluate(self, qrnn, batch_size=1024):
+    def evaluate(self,
+                 qrnn,
+                 batch_size=16384):
         """
         Run retrieval on dataset.
         """
@@ -197,26 +209,29 @@ class GPROFDataset:
         calibration = np.zeros(len(qrnn.quantiles))
 
         i_start = 0
+        quantiles = torch.tensor(qrnn.quantiles).float()
         while (i_start < n_samples):
 
             i_end = i_start + batch_size
             x = torch.tensor(self.x[i_start:i_end]).float().detach()
             y = torch.tensor(self.y[i_start:i_end]).float().detach()
 
-            y_pred = qrnn.model(x).detach().numpy()
-            y_mean[i_start:i_end] = qq.posterior_mean(
-                y_pred, qrnn.quantiles).ravel()
-            y_median[i_start:i_end] = qq.posterior_quantiles(
-                y_pred, quantiles, [0.5]).ravel()
-            dy_mean[i_start:i_end] = y_mean[i_start:i_end] - y.numpy()
-            dy_median[i_start:i_end] = y_median[i_start:i_end] - y.numpy()
+            y_pred = qrnn.model(x)
+            y_m = qq.posterior_mean(y_pred, quantiles).reshape(-1)
+            y_mean[i_start:i_end] = y_m.detach().numpy()
+            dy_mean[i_start:i_end] = (y_m - y).detach().numpy()
+
+            y_pred = qrnn.model(x)
+            y_m = qq.posterior_quantiles(y_pred, quantiles, [0.5]).reshape(-1)
+            y_median[i_start:i_end] = y_m.detach().numpy().ravel()
+            dy_median[i_start:i_end] = (y_m - y).detach().numpy().ravel()
 
             pop[i_start:i_end] = qq.probability_larger_than(
-                y_pred, qrnn.quantiles, 1e-2)
+                y_pred, quantiles, 1e-2).detach().numpy()
 
             y_true[i_start:i_end] = y.numpy()
 
-            calibration += np.sum(y.numpy().reshape(-1, 1) <= y_pred, axis=0)
+            calibration += (y.reshape(-1, 1) <= y_pred).sum(axis=0).detach().numpy()
 
             i_start = i_end
 
@@ -232,3 +247,63 @@ class GPROFDataset:
         return results
 
 
+def evaluate(data,
+             model,
+             device=torch.device("cuda")):
+
+    if not torch.cuda.is_available():
+        device = torch.device("cpu")
+
+    cpu = torch.device("cpu")
+
+    quantiles = torch.tensor(model.quantiles).float().to(device)
+    n_quantiles = len(quantiles)
+
+    means = []
+    dy_means = []
+    medians = []
+    dy_medians = []
+    ys = []
+
+    model.model.eval()
+    model.model.to(device)
+
+    with torch.no_grad():
+        for x, y in data:
+
+            x = x.float().to(device)
+            y = y.float().to(device).reshape(-1)
+
+            y_pred = model.model(x)
+
+
+            mean = qq.posterior_mean(y_pred, quantiles, quantile_axis=1).reshape(-1)
+            dy_mean = mean - y
+            median = qq.posterior_quantiles(y_pred,
+                                            quantiles,
+                                            [0.5], quantile_axis=1).reshape(-1)
+            dy_median = mean - y
+
+            means += [mean.to(cpu)]
+            dy_means += [dy_mean.to(cpu)]
+            dy_medians += [dy_mean.to(cpu)]
+            ys += [y.to(cpu)]
+
+        means = torch.cat(means, 0)
+        dy_means = torch.cat(dy_means, 0)
+        medians = torch.cat(dy_medians, 0)
+        dy_medians = torch.cat(dy_medians, 0)
+        ys = torch.cat(ys, 0)
+
+
+    dims = ["samples"]
+
+    data = {
+        "y_mean": (("samples",), means.numpy()),
+        "y_median": (("samples",), medians.numpy()),
+        "dy_mean": (("samples",), dy_means.numpy()),
+        "dy_median": (("samples",), dy_medians.numpy()),
+        "y": (("samples"), ys.numpy())
+        }
+
+    return xarray.Dataset(data)
