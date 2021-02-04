@@ -2,11 +2,13 @@ import argparse
 from pathlib import Path
 
 import numpy as np
-from regn.data.gprof import MHSDataset, GMIDataset
-from regn.models.torch import FullyConnected
+from regn.data.csu.training_data import GPROFDataset
+from quantnn.models.pytorch.fully_connected import FullyConnected
 from quantnn import DRNN
-from torch.utils.data import DataLoader
+from quantnn.data import SFTPStream
+from quantnn.normalizer import Normalizer
 import torch
+from torch.utils.data import DataLoader
 from torch import nn
 from torch import optim
 
@@ -32,8 +34,6 @@ parser.add_argument('--batch_norm', action='store_true',
                     help='How many neurons per fully-connected layer.')
 parser.add_argument('--skip_connections', action='store_true',
                     help='How many neurons per fully-connected layer.')
-parser.add_argument('--log', action='store_true',
-                    help='Whether or not to train on logarithmic rain rates.')
 
 args = parser.parse_args()
 training_data = args.training_data[0]
@@ -41,7 +41,6 @@ validation_data = args.validation_data[0]
 sensor = args.sensor[0].lower()
 batch_norm = args.batch_norm
 skip_connections = args.skip_connections
-log = args.log
 
 model_path = Path(args.model_path[0])
 model_path.mkdir(parents=False, exist_ok=True)
@@ -50,78 +49,79 @@ model_path.mkdir(parents=False, exist_ok=True)
 n_layers = args.n_layers[0]
 n_neurons = args.n_neurons[0]
 
-network_name = f"drnn_{sensor}_{n_layers}_{n_neurons}_relu_{batch_norm}_{skip_connections}_{log}.pt"
-results_name = f"drnn_{sensor}_{n_layers}_{n_neurons}_relu_{batch_norm}_{skip_connections}_{log}.dat"
+if skip_connections:
+    network_name = f"drnn_{sensor}_{n_layers}_{n_neurons}_relu_sc.pt"
+    results_name = f"drnn_{sensor}_{n_layers}_{n_neurons}_relu_sc.dat"
+else:
+    network_name = f"drnn_{sensor}_{n_layers}_{n_neurons}_relu.pt"
+    results_name = f"drnn_{sensor}_{n_layers}_{n_neurons}_relu.dat"
 
 #
 # Load the data.
 #
 
-data_classes = {"gmi": GMIDataset,
-                "mhs": MHSDataset}
+host = "129.16.35.202"
+training_path = "array1/share/Datasets/gprof/simple/training_data"
+validation_path = "array1/share/Datasets/gprof/simple/validation_data"
+dataset_factory = GPROFDataset
 
-data_class = data_classes[sensor]
-training_data = data_class(training_data,
-                           log_rain_rates=log,
-                           batch_size=512,
-                           categorical=True)
-validation_data = data_class(validation_data,
-                             normalizer=training_data.normalizer,
-                             log_rain_rates=log,
-                             batch_size=512,
-                             categorical=True)
-training_data = DataLoader(training_data, batch_size=None, num_workers=4, pin_memory=True)
-validation_data = DataLoader(validation_data, batch_size=None, num_workers=4, pin_memory=True)
+normalizer = Normalizer.load("sftp://129.16.35.202/mnt/array1/share/Datasets/gprof/simple/gprof_gmi_normalizer.pckl")
+print(normalizer.means)
+kwargs = {"batch_size": 512,
+          "normalizer": normalizer}
+
+training_data = SFTPStream(host, training_path, dataset_factory, kwargs=kwargs, n_workers=5)
+validation_data = SFTPStream(host, validation_path, dataset_factory, kwargs=kwargs, n_workers=1)
+#training_data = DataLoader(training_data, batch_size=None, num_workers=1, pin_memory=True)
+#validation_data = DataLoader(validation_data, batch_size=None, num_workers=1, pin_memory=True)
 
 #
 # Create model
 #
 
-quantiles = np.array([0.01, 0.05, 0.15, 0.25, 0.35, 0.45, 0.5, 0.55, 0.65, 0.75, 0.85, 0.95, 0.99])
-model = FullyConnected(training_data.dataset.input_features,
-                       training_data.dataset.bins.size - 1,
+bins = np.logspace(-3, 2, 257)
+model = FullyConnected(40,
+                       bins.size - 1,
                        n_layers,
                        n_neurons,
-                       batch_norm=batch_norm,
-                       log=False,
-                       skip_connections=skip_connections)
-model.quantiles = quantiles
-model.backend = "quantnn.models.pytorch"
-drnn = DRNN(training_data.dataset.bins, model=model)
+                       skip_connections=skip_connections,
+                       batch_norm=batch_norm)
+qrnn = DRNN(bins, model=model)
 
+n_epochs=20
 optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
-drnn.train(training_data=training_data,
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
+qrnn.train(training_data=training_data,
            validation_data=validation_data,
-           n_epochs=20,
+           n_epochs=n_epochs,
            optimizer=optimizer,
            scheduler=scheduler,
            device="gpu")
+qrnn.save(model_path / network_name)
 
 optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
-drnn.train(training_data=training_data,
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
+qrnn.train(training_data=training_data,
            validation_data=validation_data,
-           n_epochs=20,
+           n_epochs=n_epochs,
            optimizer=optimizer,
            scheduler=scheduler,
            device="gpu")
 optimizer = optim.SGD(model.parameters(), lr=0.001)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, 20)
-drnn.train(training_data=training_data,
-           validation_data=validation_data,
-           n_epochs=20,
-           optimizer=optimizer,
-           scheduler=scheduler,
-           device="gpu")
-
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
+losses = qrnn.train(training_data=training_data,
+                    validation_data=validation_data,
+                    n_epochs=n_epochs,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                    device="gpu")
 
 
 #
 # Store results
 #
 
-drnn.save(model_path / network_name)
+qrnn.save(model_path / network_name)
 training_errors = losses["training_errors"]
 validation_errors = losses["validation_errors"]
 np.savetxt(results_name, np.stack((training_errors, validation_errors)))
