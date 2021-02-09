@@ -5,7 +5,7 @@ import numpy as np
 from regn.data.csu.training_data import GPROFDataset
 from quantnn.models.pytorch.fully_connected import FullyConnected
 from quantnn import QRNN
-from quantnn.data import SFTPStream
+from quantnn.data import DataFolder
 from quantnn.normalizer import Normalizer
 import torch
 from torch.utils.data import DataLoader
@@ -70,8 +70,11 @@ print(normalizer.means)
 kwargs = {"batch_size": 512,
           "normalizer": normalizer}
 
-training_data = SFTPStream(host, training_path, dataset_factory, kwargs=kwargs, n_workers=5)
-validation_data = SFTPStream(host, validation_path, dataset_factory, kwargs=kwargs, n_workers=1)
+
+path = "sftp://" + host + "/" + training_path
+training_data = DataFolder(path, dataset_factory, kwargs=kwargs, n_workers=5)
+path = "sftp://" + host + "/" + validation_path
+validation_data = DataFolder(path, dataset_factory, kwargs=kwargs, n_workers=1)
 #training_data = DataLoader(training_data, batch_size=None, num_workers=1, pin_memory=True)
 #validation_data = DataLoader(validation_data, batch_size=None, num_workers=1, pin_memory=True)
 

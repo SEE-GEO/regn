@@ -5,7 +5,7 @@ import numpy as np
 from regn.data.csu.training_data import GPROFDataset
 from quantnn.models.pytorch.fully_connected import FullyConnected
 from quantnn import DRNN
-from quantnn.data import SFTPStream
+from quantnn.data import DataFolder
 from quantnn.normalizer import Normalizer
 import torch
 from torch.utils.data import DataLoader
@@ -61,19 +61,21 @@ else:
 #
 
 host = "129.16.35.202"
-training_path = "array1/share/Datasets/gprof/simple/training_data"
-validation_path = "array1/share/Datasets/gprof/simple/validation_data"
+training_path = "/mnt/array1/share/MLDatasets/gprof/simple/training_data"
+validation_path = "/mnt/array1/share/MLDatasets/gprof/simple/validation_data"
 dataset_factory = GPROFDataset
 
-normalizer = Normalizer.load("sftp://129.16.35.202/mnt/array1/share/Datasets/gprof/simple/gprof_gmi_normalizer.pckl")
+normalizer = Normalizer.load("sftp://129.16.35.202/mnt/array1/share/MLDatasets/gprof/simple/gprof_gmi_normalizer.pckl")
 print(normalizer.means)
 bins = np.logspace(-3, 2, 257)
 kwargs = {"batch_size": 512,
           "normalizer": normalizer,
           "bins": bins}
 
-training_data = SFTPStream(host, training_path, dataset_factory, kwargs=kwargs, n_workers=5, n_files=1)
-validation_data = SFTPStream(host, validation_path, dataset_factory, kwargs=kwargs, n_workers=1)
+path = "sftp://" + host + "/" + training_path
+training_data = DataFolder(path, dataset_factory, kwargs=kwargs, n_workers=5)
+path = "sftp://" + host + "/" + validation_path
+validation_data = DataFolder(path, dataset_factory, kwargs=kwargs, n_workers=1)
 #training_data = DataLoader(training_data, batch_size=None, num_workers=1, pin_memory=True)
 #validation_data = DataLoader(validation_data, batch_size=None, num_workers=1, pin_memory=True)
 
