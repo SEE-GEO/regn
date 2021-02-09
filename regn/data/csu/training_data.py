@@ -14,6 +14,7 @@ import torch
 from quantnn.normalizer import Normalizer
 from quantnn.drnn import _to_categorical
 import quantnn.quantiles as qq
+import quantnn.density as qd
 import xarray
 
 class GPROFDataset:
@@ -264,9 +265,16 @@ def evaluate(data,
     medians = []
     dy_medians = []
     ys = []
+    surfaces = []
+    airmasses = []
+    calibration = torch.zeros_like(quantiles)
+    n_samples = 0
 
     model.model.eval()
     model.model.to(device)
+
+    st_indices = torch.arange(19).reshape(1, -1).to(device)
+    am_indices = torch.arange(4).reshape(1, -1).to(device)
 
     with torch.no_grad():
         for x, y in data:
@@ -289,11 +297,20 @@ def evaluate(data,
             dy_medians += [dy_mean.to(cpu)]
             ys += [y.to(cpu)]
 
+            calibration += (y.reshape(-1, 1) < y_pred).sum(0)
+
+            n_samples += x.shape[0]
+
+            surfaces += [(x[:, 17:36] * st_indices).sum(1).cpu()]
+            airmasses += [(x[:, 36:] * am_indices).sum(1).cpu()]
+
         means = torch.cat(means, 0)
         dy_means = torch.cat(dy_means, 0)
         medians = torch.cat(dy_medians, 0)
         dy_medians = torch.cat(dy_medians, 0)
         ys = torch.cat(ys, 0)
+        surfaces = torch.cat(surfaces, 0)
+        airmasses = torch.cat(airmasses, 0)
 
 
     dims = ["samples"]
@@ -303,7 +320,102 @@ def evaluate(data,
         "y_median": (("samples",), medians.numpy()),
         "dy_mean": (("samples",), dy_means.numpy()),
         "dy_median": (("samples",), dy_medians.numpy()),
-        "y": (("samples"), ys.numpy())
+        "y": (("samples"), ys.numpy()),
+        "quantiles": (("quantiles",), quantiles.cpu().numpy()),
+        "calibration": (("quantiles",), calibration.cpu().numpy() / n_samples),
+        "surface_type": (("samples",), surfaces.numpy()),
+        "airmass_type": (("samples",), airmasses.numpy())
         }
+
+    del means
+    del dy_mean
+    del medians
+    del dy_median
+    del ys
+    del y_pred
+
+    return xarray.Dataset(data)
+
+def evaluate_drnn(data,
+                  model,
+                  device=torch.device("cuda")):
+
+    if not torch.cuda.is_available():
+        device = torch.device("cpu")
+
+    cpu = torch.device("cpu")
+
+    bins = torch.tensor(model.bins).float().to(device)
+
+    means = []
+    dy_means = []
+    medians = []
+    dy_medians = []
+    ys = []
+    n_samples = 0
+    surfaces = []
+    airmasses = []
+
+    model.model.eval()
+    model.model.to(device)
+
+    st_indices = torch.arange(19).reshape(1, -1).to(device)
+    am_indices = torch.arange(4).reshape(1, -1).to(device)
+
+    with torch.no_grad():
+        for x, y in data:
+
+            x = x.float().to(device)
+            y = y.float().to(device).reshape(-1)
+
+
+            y_pred = torch.softmax(model.model(x), 1)
+            y_pred = qd.normalize(y_pred, bins)
+
+
+            mean = qd.posterior_mean(y_pred, bins, bin_axis=1).reshape(-1)
+            dy_mean = mean - y
+            median = qd.posterior_quantiles(y_pred,
+                                            bins,
+                                            [0.5], bin_axis=1).reshape(-1)
+            dy_median = mean - y
+
+            means += [mean.to(cpu)]
+            dy_means += [dy_mean.to(cpu)]
+            dy_medians += [dy_mean.to(cpu)]
+            ys += [y.to(cpu)]
+
+            n_samples += x.shape[0]
+
+            surfaces += [(x[:, 17:36] * st_indices).sum(1).cpu()]
+            airmasses += [(x[:, 36:] * am_indices).sum(1).cpu()]
+
+        means = torch.cat(means, 0)
+        dy_means = torch.cat(dy_means, 0)
+        medians = torch.cat(dy_medians, 0)
+        dy_medians = torch.cat(dy_medians, 0)
+        ys = torch.cat(ys, 0)
+        surfaces = torch.cat(surfaces, 0)
+        airmasses = torch.cat(airmasses, 0)
+
+
+    dims = ["samples"]
+
+    data = {
+        "y_mean": (("samples",), means.numpy()),
+        "y_median": (("samples",), medians.numpy()),
+        "dy_mean": (("samples",), dy_means.numpy()),
+        "dy_median": (("samples",), dy_medians.numpy()),
+        "y": (("samples",), ys.numpy()),
+        "surface_type": (("samples",), surfaces.numpy()),
+        "airmass_type": (("samples",), airmasses.numpy())
+        }
+
+    del means
+    del dy_mean
+    del medians
+    del dy_median
+    del ys
+    del y_pred
 
     return xarray.Dataset(data)
