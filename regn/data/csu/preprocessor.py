@@ -178,7 +178,7 @@ class PreprocessorFile:
         """
         Return data in file as xarray dataset.
         """
-        data = {k: np.zeros((self.n_scans, self.n_pixels) + d[0].shape)
+        data = {k: np.zeros((self.n_scans, self.n_pixels), dtype=d[0])
                 for k, d in DATA_RECORD_TYPES.fields.items()}
         for i, s in enumerate(self.scans):
             for k, d in data.items():
