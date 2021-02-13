@@ -353,6 +353,8 @@ def evaluate_drnn(data,
     dy_medians = []
     ys = []
     n_samples = 0
+    tercile_1 = []
+    tercile_2 = []
     surfaces = []
     airmasses = []
 
@@ -378,12 +380,21 @@ def evaluate_drnn(data,
             median = qd.posterior_quantiles(y_pred,
                                             bins,
                                             [0.5], bin_axis=1).reshape(-1)
+            t1 = qd.posterior_quantiles(y_pred,
+                                        bins,
+                                        [0.01], bin_axis=1).reshape(-1)
+            t2 = qd.posterior_quantiles(y_pred,
+                                        bins,
+                                        [0.99], bin_axis=1).reshape(-1)
             dy_median = mean - y
 
             means += [mean.to(cpu)]
+            medians += [median.to(cpu)]
             dy_means += [dy_mean.to(cpu)]
-            dy_medians += [dy_mean.to(cpu)]
+            dy_medians += [dy_median.to(cpu)]
             ys += [y.to(cpu)]
+            tercile_1 += [t1.to(cpu)]
+            tercile_2 += [t2.to(cpu)]
 
             n_samples += x.shape[0]
 
@@ -392,11 +403,13 @@ def evaluate_drnn(data,
 
         means = torch.cat(means, 0)
         dy_means = torch.cat(dy_means, 0)
-        medians = torch.cat(dy_medians, 0)
+        medians = torch.cat(medians, 0)
         dy_medians = torch.cat(dy_medians, 0)
         ys = torch.cat(ys, 0)
         surfaces = torch.cat(surfaces, 0)
         airmasses = torch.cat(airmasses, 0)
+        tercile_1 = torch.cat(tercile_1, 0)
+        tercile_2 = torch.cat(tercile_2, 0)
 
 
     dims = ["samples"]
@@ -408,7 +421,9 @@ def evaluate_drnn(data,
         "dy_median": (("samples",), dy_medians.numpy()),
         "y": (("samples",), ys.numpy()),
         "surface_type": (("samples",), surfaces.numpy()),
-        "airmass_type": (("samples",), airmasses.numpy())
+        "airmass_type": (("samples",), airmasses.numpy()),
+        "1st_tercile": (("samples",), tercile_1.numpy()),
+        "2nd_tercile": (("samples",), tercile_2.numpy())
         }
 
     del means
@@ -419,3 +434,163 @@ def evaluate_drnn(data,
     del y_pred
 
     return xarray.Dataset(data)
+
+class GPROFConvDataset:
+    """
+    Dataset interface to load GPROF  data from NetCDF file.
+
+    Attributes:
+        x: Rank-4 tensor containing the input data with
+           samples along first dimension.
+        y: Rank-3 tensor containing the target values.
+        filename: The filename from which the data is loaded.
+        target: The name of the variable used as target variable.
+        batch_size: The size of data batches returned by __getitem__ method.
+        normalizer: The normalizer used to normalize the data.
+        shuffle: Whether or not the ordering of the data is shuffled.
+    """
+    def __init__(self,
+                 filename,
+                 target="surface_precip",
+                 normalize=True,
+                 transform_zero_rain=True,
+                 batch_size=None,
+                 normalizer=None,
+                 shuffle=True,
+                 bins=None):
+        """
+        Create GPROF dataset.
+
+        Args:
+            filename: Path to the NetCDF file containing the data to
+                 load.
+            target: The variable to use as target (output) variable.
+            normalize: Whether or not to normalize the input data.
+            transform_zero_rain: Whether or not to replace very small
+                 and zero rain with random amounts in the range [1e-6, 1e-4]
+        """
+        self.filename = filename
+        self.target = target
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self._load_data()
+
+        indices_1h = list(range(17, 40))
+        if normalizer is None:
+            self.normalizer = Normalizer(self.x)
+        else:
+            self.normalizer = normalizer
+
+        if normalize:
+            self.x = self.normalizer(self.x)
+
+        if transform_zero_rain:
+            self._transform_zero_rain()
+
+        self.x = self.x.astype(np.float32)
+        self.y = self.y.astype(np.float32)
+
+        if bins is not None:
+            self.binned = True
+            self.y = _to_categorical(self.y, bins)
+        else:
+            self.binned = False
+
+        self._shuffled = False
+        if self.shuffle:
+            self._shuffle()
+
+
+    def _transform_zero_rain(self):
+        """
+        Transforms rain amounts smaller than 1e-4 to a random amount withing
+        the range [1e-6, 1e-4], which helps to stabilize training of QRNNs.
+        """
+        indices = (self.y < 1e-4) * (self.y >= 0.0)
+        self.y[indices] = np.random.uniform(1e-6, 1.0e-4, indices.sum())
+
+    def _load_data(self):
+        """
+        Loads the data from the file into the classes ``x`` attribute.
+        """
+        with Dataset(self.filename, "r") as dataset:
+
+            LOGGER.info("Loading data from file: %s",
+                        self.filename)
+
+            variables = dataset.variables
+            n = dataset.dimensions["samples"].size
+            h = dataset.dimensions["scans"].size
+            w = dataset.dimensions["pixels"].size
+            c = dataset.dimensions["channels"].size
+
+            #
+            # Input data
+            #
+
+            # Brightness temperatures
+            bt = np.zeros((n, c, h, w))
+            sp = np.zeros((n, h, w))
+
+            index_start = 0
+            chunk_size = 128
+            v_bt = dataset["brightness_temperatures"]
+            v_sp = dataset["surface_precip"]
+            while index_start < n:
+                index_end = index_start + chunk_size
+                bts = v_bt[index_start: index_end].data
+                bt[index_start: index_end] = np.transpose(bts, [0, 3, 1, 2])
+                sp[index_start: index_end] = v_sp[index_start: index_end].data
+                index_start += chunk_size
+
+            valid = np.where(~np.all(np.isnan(sp), axis=(1, 2)))[0]
+            self.x = bt[valid]
+            self.y = sp[valid]
+            self.y[np.isnan(self.y)] = -1.0
+
+    def _shuffle(self):
+        if not self._shuffled:
+            indices = np.random.permutation(self.x.shape[0])
+            self.x = self.x[indices]
+            self.y = self.y[indices]
+            self._shuffled = True
+
+
+    def __getitem__(self, i):
+        """
+        Return element from the dataset. This is part of the
+        pytorch interface for datasets.
+
+        Args:
+            i(int): The index of the sample to return
+        """
+
+        self._shuffled = False
+        if self.batch_size is None:
+            return (torch.tensor(self.x[i]),
+                    torch.tensor(self.y[i]))
+
+        i_start = self.batch_size * i
+        i_end = self.batch_size * (i + 1)
+
+        if i + 1 == len(self):
+            print("shufflin' ...")
+            self._shuffle()
+            if not self.binned:
+                self._transform_zero_rain()
+
+        if i >= len(self):
+            raise IndexError()
+        return (torch.tensor(self.x[i_start:i_end]),
+                torch.tensor(self.y[i_start:i_end]))
+
+    def __len__(self):
+        """
+        The number of samples in the dataset.
+        """
+        if self.batch_size:
+            n = self.x.shape[0] // self.batch_size
+            return n
+        else:
+            return self.x.shape[0]
+
