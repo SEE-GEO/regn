@@ -67,7 +67,7 @@ dataset_factory = GPROFDataset
 
 normalizer = Normalizer.load("sftp://129.16.35.202/mnt/array1/share/MLDatasets/gprof/simple/gprof_gmi_normalizer.pckl")
 print(normalizer.means)
-bins = np.logspace(-3, 2, 257)
+bins = np.logspace(-4, 2.5, 257)
 kwargs = {"batch_size": 512,
           "normalizer": normalizer,
           "bins": bins}
@@ -89,42 +89,45 @@ model = FullyConnected(40,
                        n_neurons,
                        skip_connections=skip_connections,
                        batch_norm=batch_norm)
-qrnn = DRNN(bins, model=model)
+drnn = DRNN(bins, model=model)
 
+n_epochs=5
+optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
+drnn.train(training_data=training_data,
+           validation_data=validation_data,
+           n_epochs=n_epochs,
+           optimizer=optimizer,
+           scheduler=scheduler,
+           device="gpu")
+drnn.save(model_path / network_name)
+n_epochs=10
+optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
+drnn.train(training_data=training_data,
+           validation_data=validation_data,
+           n_epochs=n_epochs,
+           optimizer=optimizer,
+           scheduler=scheduler,
+           device="gpu")
+drnn.save(model_path / network_name)
 n_epochs=20
 optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
-qrnn.train(training_data=training_data,
+drnn.train(training_data=training_data,
            validation_data=validation_data,
            n_epochs=n_epochs,
            optimizer=optimizer,
            scheduler=scheduler,
            device="gpu")
-qrnn.save(model_path / network_name)
-
-optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+drnn.save(model_path / network_name)
+n_epochs=40
+optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
-qrnn.train(training_data=training_data,
+drnn.train(training_data=training_data,
            validation_data=validation_data,
            n_epochs=n_epochs,
            optimizer=optimizer,
            scheduler=scheduler,
            device="gpu")
-optimizer = optim.SGD(model.parameters(), lr=0.001)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
-losses = qrnn.train(training_data=training_data,
-                    validation_data=validation_data,
-                    n_epochs=n_epochs,
-                    optimizer=optimizer,
-                    scheduler=scheduler,
-                    device="gpu")
-
-
-#
-# Store results
-#
-
-qrnn.save(model_path / network_name)
-training_errors = losses["training_errors"]
-validation_errors = losses["validation_errors"]
-np.savetxt(results_name, np.stack((training_errors, validation_errors)))
+drnn.save(model_path / network_name)
