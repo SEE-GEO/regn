@@ -353,6 +353,8 @@ def evaluate_drnn(data,
     dy_medians = []
     ys = []
     n_samples = 0
+    tercile_1 = []
+    tercile_2 = []
     surfaces = []
     airmasses = []
 
@@ -378,12 +380,21 @@ def evaluate_drnn(data,
             median = qd.posterior_quantiles(y_pred,
                                             bins,
                                             [0.5], bin_axis=1).reshape(-1)
+            t1 = qd.posterior_quantiles(y_pred,
+                                        bins,
+                                        [0.01], bin_axis=1).reshape(-1)
+            t2 = qd.posterior_quantiles(y_pred,
+                                        bins,
+                                        [0.99], bin_axis=1).reshape(-1)
             dy_median = mean - y
 
             means += [mean.to(cpu)]
+            medians += [median.to(cpu)]
             dy_means += [dy_mean.to(cpu)]
-            dy_medians += [dy_mean.to(cpu)]
+            dy_medians += [dy_median.to(cpu)]
             ys += [y.to(cpu)]
+            tercile_1 += [t1.to(cpu)]
+            tercile_2 += [t2.to(cpu)]
 
             n_samples += x.shape[0]
 
@@ -392,11 +403,13 @@ def evaluate_drnn(data,
 
         means = torch.cat(means, 0)
         dy_means = torch.cat(dy_means, 0)
-        medians = torch.cat(dy_medians, 0)
+        medians = torch.cat(medians, 0)
         dy_medians = torch.cat(dy_medians, 0)
         ys = torch.cat(ys, 0)
         surfaces = torch.cat(surfaces, 0)
         airmasses = torch.cat(airmasses, 0)
+        tercile_1 = torch.cat(tercile_1, 0)
+        tercile_2 = torch.cat(tercile_2, 0)
 
 
     dims = ["samples"]
@@ -408,7 +421,9 @@ def evaluate_drnn(data,
         "dy_median": (("samples",), dy_medians.numpy()),
         "y": (("samples",), ys.numpy()),
         "surface_type": (("samples",), surfaces.numpy()),
-        "airmass_type": (("samples",), airmasses.numpy())
+        "airmass_type": (("samples",), airmasses.numpy()),
+        "1st_tercile": (("samples",), tercile_1.numpy()),
+        "2nd_tercile": (("samples",), tercile_2.numpy())
         }
 
     del means
