@@ -11,7 +11,7 @@ LOGGER = logging.getLogger(__name__)
 from netCDF4 import Dataset
 import numpy as np
 import torch
-from quantnn.normalizer import Normalizer
+from quantnn.normalizer import MinMaxNormalizer, Normalizer
 from quantnn.drnn import _to_categorical
 import quantnn.quantiles as qq
 import quantnn.density as qd
@@ -477,7 +477,7 @@ class GPROFConvDataset:
 
         indices_1h = list(range(17, 40))
         if normalizer is None:
-            self.normalizer = Normalizer(self.x)
+            self.normalizer = MinMaxNormalizer(self.x)
         else:
             self.normalizer = normalizer
 
@@ -543,10 +543,28 @@ class GPROFConvDataset:
                 sp[index_start: index_end] = v_sp[index_start: index_end].data
                 index_start += chunk_size
 
+            bt[bt < 0.0] = np.nan
+            bt[bt > 500.0] = np.nan
+
             valid = np.where(~np.all(np.isnan(sp), axis=(1, 2)))[0]
             self.x = bt[valid]
             self.y = sp[valid]
             self.y[np.isnan(self.y)] = -1.0
+
+            for i in range(self.x.shape[0]):
+                r = np.random.rand()
+                if (r > 0.5):
+                    self.x[i] = np.transpose(self.x[i], [0, 2, 1])
+                    self.y[i] = np.transpose(self.y[i], [1, 0])
+                r = np.random.rand()
+                if (r > 0.5):
+                    self.x[i] = np.flip(self.x[i], axis=2)
+                    self.y[i] = np.flip(self.y[i], axis=1)
+                r = np.random.rand()
+                if (r > 0.5):
+                    self.x[i] = np.flip(self.x[i], axis=1)
+                    self.y[i] = np.flip(self.y[i], axis=0)
+
 
     def _shuffle(self):
         if not self._shuffled:
