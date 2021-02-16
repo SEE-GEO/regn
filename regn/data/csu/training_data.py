@@ -17,6 +17,8 @@ import quantnn.quantiles as qq
 import quantnn.density as qd
 import xarray
 
+from regn.data.augmentation import extract_subscene, mask_flanks
+
 class GPROFDataset:
     """
     Dataset interface to load GPROF data from NetCDF file.
@@ -435,6 +437,44 @@ def evaluate_drnn(data,
 
     return xarray.Dataset(data)
 
+import math
+
+def _pixel_offset(pixel_index):
+    a = 30 / 110 ** 2
+    b = 110
+    offset = a * (pixel_index - b) ** 2
+    return offset
+
+
+def _extract_subscene(input_data, p_in, p_out):
+    """
+    Data augmentation function that extracts 164 x 164 patches from larger
+    patch and transforms the data to simulate retrievals at different regions
+    of the swath.
+    """
+    p_in = np.clip(p_in, -1.0, 1.0)
+    p_out = np.clip(p_out, -1.0, 1.0)
+    c_in = int(110  + 0.5 * (157 - 65) * p_in)
+    c_out = int(110  + 0.5 * (157 - 65) * p_out)
+
+    offsets_in = _pixel_offset(np.arange(c_in - 64, c_in + 64))
+    offsets_out = _pixel_offset(np.arange(c_out - 64, c_out + 64))
+
+    out = np.zeros_like(input_data, shape=input_data.shape[:-2] + (128, 128))
+    scan_start = 57
+    for i in range(128):
+        o_in = offsets_in[i]
+        o_out = offsets_out[i]
+        d_o = o_out - o_in
+
+        i_start = math.floor(scan_start + d_o)
+        c = scan_start + d_o - i_start
+
+        out[..., :, i] = (1.0 - c) * input_data[..., i_start:i_start + 128, c_in - 64 + i]
+        out[..., :, i] += c * input_data[..., i_start + 1:i_start + 129, c_in - 64 + i]
+    return out
+
+
 class GPROFConvDataset:
     """
     Dataset interface to load GPROF  data from NetCDF file.
@@ -529,8 +569,8 @@ class GPROFConvDataset:
             #
 
             # Brightness temperatures
-            bt = np.zeros((n, c, h, w))
-            sp = np.zeros((n, h, w))
+            bt = np.zeros((n, h, w, c), np.float32)
+            sp = np.zeros((n, h, w), np.float32)
 
             index_start = 0
             chunk_size = 128
@@ -539,7 +579,7 @@ class GPROFConvDataset:
             while index_start < n:
                 index_end = index_start + chunk_size
                 bts = v_bt[index_start: index_end].data
-                bt[index_start: index_end] = np.transpose(bts, [0, 3, 1, 2])
+                bt[index_start: index_end] = bts
                 sp[index_start: index_end] = v_sp[index_start: index_end].data
                 index_start += chunk_size
 
@@ -547,20 +587,30 @@ class GPROFConvDataset:
             bt[bt > 500.0] = np.nan
 
             valid = np.where(~np.all(np.isnan(sp), axis=(1, 2)))[0]
-            self.x = bt[valid]
-            self.y = sp[valid]
-            self.y[np.isnan(self.y)] = -1.0
+
+            bt = bt[valid]
+            sp = sp[valid]
+
+            self.x = np.zeros_like(sp, shape=(n, c, 128, 128))
+            self.y = np.zeros_like(sp, shape=(n, 128, 128))
 
             for i in range(self.x.shape[0]):
+
+                p_in = np.random.uniform(-1, 1)
+                p_out = np.random.uniform(-1, 1)
+
+                self.x[i] = np.transpose(extract_subscene(bt[i], p_in, p_out), [2, 0, 1])
+                self.y[i] = extract_subscene(sp[i], p_in, p_out)
+
+
                 r = np.random.rand()
-                if (r > 0.5):
-                    self.x[i] = np.transpose(self.x[i], [0, 2, 1])
-                    self.y[i] = np.transpose(self.y[i], [1, 0])
+                if r < 0.05:
+                    mask_flanks(self.x[i], p_out)
+
                 r = np.random.rand()
                 if (r > 0.5):
                     self.x[i] = np.flip(self.x[i], axis=2)
                     self.y[i] = np.flip(self.y[i], axis=1)
-                r = np.random.rand()
                 if (r > 0.5):
                     self.x[i] = np.flip(self.x[i], axis=1)
                     self.y[i] = np.flip(self.y[i], axis=0)
