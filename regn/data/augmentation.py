@@ -122,14 +122,22 @@ def extract_subscene(img_data, p_i, p_o):
     coords = np.concatenate([s_coords.reshape(-1, 1), p_coords.reshape(-1, 1)], axis=1)
     return interpolator(coords).reshape((128, 128) + img_data.shape[2:])
 
-def mask_flanks(obs, p_o):
+def mask_stripe(obs, p_o):
+    """
+    Masks high-frequency channels over or close to the ground truth to teach the
+    network how to handle pixels where the high-frequency observations are missing.
+
+    Args:
+        obs: 15 x 128 x 128 GMI image.
+        p_o: Fractional location of the output window.
+    """
 
     d = p_o * 46
     c = 110
     i_l = int(c + d - 10)
     i_r = int(c + d + 10)
 
-    obs[..., :, i_l:i_r] = -2.0
+    obs[..., 9:, i_l:i_r] = np.nan
 
 
 
