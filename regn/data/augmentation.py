@@ -132,12 +132,14 @@ def mask_stripe(obs, p_o):
         p_o: Fractional location of the output window.
     """
 
-    d = p_o * 46
-    c = 110
-    i_l = int(c + d - 10)
-    i_r = int(c + d + 10)
+    if np.any(np.isnan(obs[:, 0])):
+        i = np.random.randint(2, 64)
+        obs[..., 9:, :, -i:] = np.nan
 
-    obs[..., 9:, i_l:i_r] = np.nan
+    if np.any(np.isnan(obs[:, -1])):
+        i = np.random.randint(2, 64)
+        obs[..., 9:, :, :i] = np.nan
+
 
 
 

@@ -11,6 +11,7 @@ from regn.data.csu.preprocessor import PreprocessorFile
 import numpy as np
 import quantnn.quantiles as qq
 import xarray
+import torch
 
 N_CHANNELS = 15
 
@@ -70,6 +71,35 @@ class InputData(Dataset):
 
         x = np.concatenate([bts, t2m, tcwv, st_1h, am_1h], axis=1)
         return self.normalizer(x)
+
+    def get_conv_input(self, i):
+
+        m = 32 * int((self.n_scans / 32 + 0.5))
+        dm = m - self.n_scans
+
+        n = 32 * int((self.n_pixels / 32 + 0.5))
+        dn = n - self.n_pixels
+
+
+        p_m_l = dm // 2
+        p_m_r = dm - p_m_l
+        p_n_l = dn // 2
+        p_n_r = dn - p_n_l
+
+        print(p_n_l, p_n_r, p_m_l, p_m_r)
+
+        bts = self.data["brightness_temperatures"].data.copy()
+        bts[bts < 0.0] = np.nan
+        bts[bts > 500.0] = np.nan
+
+        x = torch.zeros(1, 15, self.n_scans, self.n_pixels)
+        for i in range(15):
+            x[0, i] = torch.tensor(bts[:, :, i])
+
+        x = torch.nn.functional.pad(x, [p_n_l, p_n_r, p_m_l, p_m_r], "reflect")
+
+        return x
+
 
     def run_retrieval(self, qrnn):
         quantiles = qrnn.quantiles

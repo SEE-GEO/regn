@@ -63,6 +63,9 @@ class GPROFDataset:
         if normalizer is None:
             self.normalizer = Normalizer(self.x,
                                          exclude_indices=indices_1h)
+        elif isinstance(normalizer, type):
+            self.normalizer = normalizer(self.x,
+                                         exclude_indices=indices_1h)
         else:
             self.normalizer = normalizer
 
@@ -114,7 +117,7 @@ class GPROFDataset:
             m = dataset.dimensions["channel"].size
             bts = np.zeros((n, m))
             index_start = 0
-            chunk_size = 1024
+            chunk_size = 8192
             v = dataset["brightness_temps"]
             while index_start < n:
                 index_end = index_start + chunk_size
@@ -281,53 +284,62 @@ def evaluate(data,
     with torch.no_grad():
         for x, y in data:
 
+
             x = x.float().to(device)
-            y = y.float().to(device).reshape(-1)
+            y = torch.unsqueeze(y.float().to(device), 1)
 
             y_pred = model.model(x)
 
 
-            mean = qq.posterior_mean(y_pred, quantiles, quantile_axis=1).reshape(-1)
+            mean = qq.posterior_mean(y_pred, quantiles, quantile_axis=1)
             dy_mean = mean - y
             median = qq.posterior_quantiles(y_pred,
                                             quantiles,
-                                            [0.5], quantile_axis=1).reshape(-1)
-            dy_median = mean - y
+                                            [0.5], quantile_axis=1)
+            dy_median = median - y
 
-            means += [mean.to(cpu)]
-            dy_means += [dy_mean.to(cpu)]
-            dy_medians += [dy_mean.to(cpu)]
-            ys += [y.to(cpu)]
+            means += [mean.to(cpu).squeeze(1)]
+            dy_means += [dy_mean.to(cpu).squeeze(1)]
+            dy_medians += [dy_mean.to(cpu).squeeze(1)]
+            ys += [y.to(cpu).squeeze(1)]
 
-            calibration += (y.reshape(-1, 1) < y_pred).sum(0)
+            print(ys[-1].shape)
+
+
+            #shape[1] = -1
+            calibration += (y < y_pred).sum((0, 2, 3))
 
             n_samples += x.shape[0]
 
-            surfaces += [(x[:, 17:36] * st_indices).sum(1).cpu()]
-            airmasses += [(x[:, 36:] * am_indices).sum(1).cpu()]
+            if x.shape[1] > 15:
+                surfaces += [(x[:, 17:36] * st_indices).sum(1).cpu()]
+                airmasses += [(x[:, 36:] * am_indices).sum(1).cpu()]
 
         means = torch.cat(means, 0)
         dy_means = torch.cat(dy_means, 0)
         medians = torch.cat(dy_medians, 0)
         dy_medians = torch.cat(dy_medians, 0)
         ys = torch.cat(ys, 0)
-        surfaces = torch.cat(surfaces, 0)
-        airmasses = torch.cat(airmasses, 0)
+        if x.shape[1] > 15:
+            surfaces = torch.cat(surfaces, 0)
+            airmasses = torch.cat(airmasses, 0)
 
 
-    dims = ["samples"]
+    dims = ["samples", "scans", "pixels"]
 
     data = {
-        "y_mean": (("samples",), means.numpy()),
-        "y_median": (("samples",), medians.numpy()),
-        "dy_mean": (("samples",), dy_means.numpy()),
-        "dy_median": (("samples",), dy_medians.numpy()),
-        "y": (("samples"), ys.numpy()),
+        "y_mean": (dims, means.numpy()),
+        "y_median": (dims, medians.numpy()),
+        "dy_mean": (dims, dy_means.numpy()),
+        "dy_median": (dims, dy_medians.numpy()),
+        "y": (dims, ys.numpy()),
         "quantiles": (("quantiles",), quantiles.cpu().numpy()),
         "calibration": (("quantiles",), calibration.cpu().numpy() / n_samples),
-        "surface_type": (("samples",), surfaces.numpy()),
-        "airmass_type": (("samples",), airmasses.numpy())
         }
+    if x.shape[1] > 15:
+        data["surface_type"] = (("samples",), surfaces.numpy())
+        data["airmass_type"] = (("samples",), surfaces.numpy())
+
 
     del means
     del dy_mean
@@ -497,7 +509,8 @@ class GPROFConvDataset:
                  batch_size=None,
                  normalizer=None,
                  shuffle=True,
-                 bins=None):
+                 bins=None,
+                 augment=True):
         """
         Create GPROF dataset.
 
@@ -513,11 +526,14 @@ class GPROFConvDataset:
         self.target = target
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.augment = augment
         self._load_data()
 
         indices_1h = list(range(17, 40))
         if normalizer is None:
             self.normalizer = MinMaxNormalizer(self.x)
+        elif isinstance(normalizer, type):
+            self.normalizer = normalizer(self.x)
         else:
             self.normalizer = normalizer
 
@@ -596,6 +612,11 @@ class GPROFConvDataset:
 
             for i in range(self.x.shape[0]):
 
+                if not self.augment:
+                    self.x[i] = np.transpose(extract_subscene(bt[i], 0.0, 0.0), [2, 0, 1])
+                    self.y[i] = extract_subscene(sp[i], 0.0, 0.0)
+                    continue
+
                 p_in = np.random.uniform(-1, 1)
                 p_out = np.random.uniform(-1, 1)
 
@@ -604,7 +625,7 @@ class GPROFConvDataset:
 
 
                 r = np.random.rand()
-                if r < 0.05:
+                if r < 0.2:
                     mask_stripe(self.x[i], p_out)
 
                 r = np.random.rand()
