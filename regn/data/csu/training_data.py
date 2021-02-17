@@ -17,7 +17,7 @@ import quantnn.quantiles as qq
 import quantnn.density as qd
 import xarray
 
-from regn.data.augmentation import extract_subscene, mask_flanks
+from regn.data.augmentation import extract_subscene, mask_stripe
 
 class GPROFDataset:
     """
@@ -605,7 +605,7 @@ class GPROFConvDataset:
 
                 r = np.random.rand()
                 if r < 0.05:
-                    mask_flanks(self.x[i], p_out)
+                    mask_stripe(self.x[i], p_out)
 
                 r = np.random.rand()
                 if (r > 0.5):
