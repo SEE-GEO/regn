@@ -134,11 +134,11 @@ def mask_stripe(obs, p_o):
 
     if np.any(np.isnan(obs[:, 0])):
         i = np.random.randint(2, 64)
-        obs[..., 9:, :, -i:] = np.nan
+        obs[..., 10:, :, -i:] = np.nan
 
     if np.any(np.isnan(obs[:, -1])):
         i = np.random.randint(2, 64)
-        obs[..., 9:, :, :i] = np.nan
+        obs[..., 10:, :, :i] = np.nan
 
 
 
