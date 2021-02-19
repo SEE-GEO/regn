@@ -199,58 +199,68 @@ class GPROFDataset:
             return self.x.shape[0]
 
     def evaluate(self,
-                 qrnn,
+                 model,
                  batch_size=16384):
         """
         Run retrieval on dataset.
         """
-        n_samples = self.x.shape[0]
-        quantiles = qrnn.quantiles
-        y_mean = np.zeros(n_samples)
-        y_median = np.zeros(n_samples)
-        dy_mean = np.zeros(n_samples)
-        dy_median = np.zeros(n_samples)
-        pop = np.zeros(n_samples)
-        y_true = np.zeros(n_samples)
-        calibration = np.zeros(len(qrnn.quantiles))
+        y_means = []
+        y_medians = []
+        dy_means = []
+        dy_medians = []
+        pops = []
+        y_trues = []
+        surfaces = []
+        airmasses = []
+
+        st_indices = torch.arange(19).reshape(1, -1).to(device)
+        am_indices = torch.arange(4).reshape(1, -1).to(device)
 
         i_start = 0
-        quantiles = torch.tensor(qrnn.quantiles).float()
-        while (i_start < n_samples):
+        with torch.no_grad():
+            while (i_start < n_samples):
+                i_end = i_start + batch_size
+                x = torch.tensor(self.x[i_start:i_end]).float().detach()
+                y = torch.tensor(self.y[i_start:i_end]).float().detach()
 
-            i_end = i_start + batch_size
-            x = torch.tensor(self.x[i_start:i_end]).float().detach()
-            y = torch.tensor(self.y[i_start:i_end]).float().detach()
+                y_pred = model.model(x)
+                y_mean = model.posterior_mean(y_pred=y_pred).reshape(-1)
+                dy_mean = y_mean - y
+                y_median = model.posterior_quantiles(y_pred=y_pred, quantiles=[0.5]).unsqueeze[1]
+                dy_median = y_median - y
 
-            y_pred = qrnn.model(x)
-            y_m = qq.posterior_mean(y_pred, quantiles).reshape(-1)
-            y_mean[i_start:i_end] = y_m.detach().numpy()
-            dy_mean[i_start:i_end] = (y_m - y).detach().numpy()
+                y_means.append(y_mean.cpu())
+                dy_means.append(dy_mean.cpu())
+                y_medians.append(y_median.cpu())
+                dy_medians.append(dy_median.cpu())
 
-            y_pred = qrnn.model(x)
-            y_m = qq.posterior_quantiles(y_pred, quantiles, [0.5]).reshape(-1)
-            y_median[i_start:i_end] = y_m.detach().numpy().ravel()
-            dy_median[i_start:i_end] = (y_m - y).detach().numpy().ravel()
+                pops.append(model.probability_larger_than(y_pred=y_pred, y=1e-2).cpu())
+                y_trues.append(y.cpu())
 
-            pop[i_start:i_end] = qq.probability_larger_than(
-                y_pred, quantiles, 1e-2).detach().numpy()
+                surfaces += [(x[:, 17:36] * st_indices).sum(1).cpu()]
+                airmasses += [(x[:, 36:] * am_indices).sum(1).cpu()]
 
-            y_true[i_start:i_end] = y.numpy()
+        y_means = torch.cat(y_means, 0).detach().numpy()
+        y_medians = torch.cat(y_medians, 0).detach().numpy()
+        dy_means = torch.cat(dy_means, 0).detach().numpy()
+        dy_medians = torch.cat(dy_medians, 0).detach().numpy()
+        pop = torch.cat(pops, 0).detach().numpy()
+        y_true = torch.cat(y_trues, 0).detach().numpy()
+        surfaces = torch.cat(surfaces, 0).detach().numpy()
+        airmasses = torch.cat(airmasses, 0).detach().numpy()
 
-            calibration += (y.reshape(-1, 1) <= y_pred).sum(axis=0).detach().numpy()
+        dims = ["samples"]
 
-            i_start = i_end
-
-        calibration /= n_samples
-
-        results = {"y_mean": y_mean,
-                   "dy_mean": dy_mean,
-                   "y_median": y_median,
-                   "dy_median": dy_median,
-                   "pop": pop,
-                   "y_true": y_true,
-                   "calibration": calibration}
-        return results
+        data = {
+            "y_mean": (dims, means),
+            "y_median": (dims, medians),
+            "dy_mean": (dims, dy_means),
+            "dy_median": (dims, dy_medians),
+            "y": (dims, ys),
+            "surface_type": (dims, surfaces),
+            "airmass_type": (dims, airmasses)
+            }
+        return xarray.Dataset(data)
 
 
 def evaluate(data,

@@ -92,6 +92,9 @@ class InputData(Dataset):
         bts[bts < 0.0] = np.nan
         bts[bts > 500.0] = np.nan
 
+        mask = np.isnan(bts[:, :, 10])
+        bts[:, :, 9][mask] = np.nan
+
         x = torch.zeros(1, 15, self.n_scans, self.n_pixels)
         for i in range(15):
             x[0, i] = torch.tensor(bts[:, :, i])
