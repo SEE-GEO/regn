@@ -636,6 +636,8 @@ class GPROFConvDataset:
                     self.x[i] = np.flip(self.x[i], axis=1)
                     self.y[i] = np.flip(self.y[i], axis=0)
 
+                self.y[np.isnan(self.y)] = -2.0
+
 
     def _shuffle(self):
         if not self._shuffled:
