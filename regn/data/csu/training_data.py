@@ -558,7 +558,9 @@ class GPROFConvDataset:
 
         if bins is not None:
             self.binned = True
+            invalid = self.y < 0.0
             self.y = _to_categorical(self.y, bins)
+            self.y[invalid] = -1.0
         else:
             self.binned = False
 
