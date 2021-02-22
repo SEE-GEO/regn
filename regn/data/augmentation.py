@@ -66,7 +66,7 @@ def get_pixel_coordinates(p_i, p_o):
 
     return i_i
 
-def get_scan_offsets(p_i, p_o):
+def get_scan_offsets(p_i, p_o, s_o=0.0):
     """
     Calculate the relative scan offsets across the swath.
 
@@ -93,9 +93,14 @@ def get_scan_offsets(p_i, p_o):
     o_o = scan_offset(np.linspace(o_l, o_r, 128))
 
     scan_coords = 110 - 64 + o_o - o_i
-    return scan_coords
 
-def extract_subscene(img_data, p_i, p_o):
+    d_l = scan_coords.min()
+    d_r = 220 - 128 - scan_coords.max()
+    shift = -d_l + (d_r + d_l) * 0.5 * (s_o + 1.0)
+
+    return scan_coords + shift
+
+def extract_subscene(img_data, p_i, p_o, s_o=0.0):
     """
     Extract subscenene from a full-swath (221 x 221) of GMI observations.
 
@@ -114,7 +119,7 @@ def extract_subscene(img_data, p_i, p_o):
     indices = np.arange(221)
     interpolator = RegularGridInterpolator((indices, indices), img_data)
 
-    s_offsets = get_scan_offsets(p_i, p_o)
+    s_offsets = get_scan_offsets(p_i, p_o, s_o)
     s_coords = s_offsets.reshape(1, -1) + np.arange(128).reshape(-1, 1)
     p_coords = get_pixel_coordinates(p_i, p_o).reshape(1, -1)
     p_coords = np.broadcast_to(p_coords, s_coords.shape)

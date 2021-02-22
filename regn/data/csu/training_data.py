@@ -15,6 +15,7 @@ from quantnn.normalizer import MinMaxNormalizer, Normalizer
 from quantnn.drnn import _to_categorical
 import quantnn.quantiles as qq
 import quantnn.density as qd
+from tqdm import tqdm
 import xarray
 
 from regn.data.augmentation import extract_subscene, mask_stripe
@@ -200,10 +201,12 @@ class GPROFDataset:
 
     def evaluate(self,
                  model,
-                 batch_size=16384):
+                 batch_size=16384,
+                 device=torch.device("cuda")):
         """
         Run retrieval on dataset.
         """
+        n_samples = self.x.shape[0]
         y_means = []
         y_medians = []
         dy_means = []
@@ -215,19 +218,26 @@ class GPROFDataset:
 
         st_indices = torch.arange(19).reshape(1, -1).to(device)
         am_indices = torch.arange(4).reshape(1, -1).to(device)
-
         i_start = 0
-        with torch.no_grad():
-            while (i_start < n_samples):
-                i_end = i_start + batch_size
-                x = torch.tensor(self.x[i_start:i_end]).float().detach()
-                y = torch.tensor(self.y[i_start:i_end]).float().detach()
+        model.model.to(device)
 
-                y_pred = model.model(x)
+        with torch.no_grad():
+            for i in tqdm(range(n_samples // batch_size + 1)):
+                i_start = i * batch_size
+                i_end = i_start + batch_size
+                if i_start >= n_samples:
+                    break
+
+                x = torch.tensor(self.x[i_start:i_end]).float().to(device)
+                y = torch.tensor(self.y[i_start:i_end]).float().to(device)
+                i_start += batch_size
+
+                y_pred = model.predict(x)
                 y_mean = model.posterior_mean(y_pred=y_pred).reshape(-1)
                 dy_mean = y_mean - y
-                y_median = model.posterior_quantiles(y_pred=y_pred, quantiles=[0.5]).unsqueeze[1]
+                y_median = model.posterior_quantiles(y_pred=y_pred, quantiles=[0.5]).squeeze(1)
                 dy_median = y_median - y
+
 
                 y_means.append(y_mean.cpu())
                 dy_means.append(dy_mean.cpu())
@@ -244,19 +254,20 @@ class GPROFDataset:
         y_medians = torch.cat(y_medians, 0).detach().numpy()
         dy_means = torch.cat(dy_means, 0).detach().numpy()
         dy_medians = torch.cat(dy_medians, 0).detach().numpy()
-        pop = torch.cat(pops, 0).detach().numpy()
-        y_true = torch.cat(y_trues, 0).detach().numpy()
+        pops = torch.cat(pops, 0).detach().numpy()
+        y_trues = torch.cat(y_trues, 0).detach().numpy()
         surfaces = torch.cat(surfaces, 0).detach().numpy()
         airmasses = torch.cat(airmasses, 0).detach().numpy()
 
         dims = ["samples"]
 
         data = {
-            "y_mean": (dims, means),
-            "y_median": (dims, medians),
+            "y_mean": (dims, y_means),
+            "y_median": (dims, y_medians),
             "dy_mean": (dims, dy_means),
             "dy_median": (dims, dy_medians),
-            "y": (dims, ys),
+            "y": (dims, y_trues),
+            "pop": (dims, pops),
             "surface_type": (dims, surfaces),
             "airmass_type": (dims, airmasses)
             }
@@ -294,12 +305,10 @@ def evaluate(data,
     with torch.no_grad():
         for x, y in data:
 
-
             x = x.float().to(device)
             y = torch.unsqueeze(y.float().to(device), 1)
 
             y_pred = model.model(x)
-
 
             mean = qq.posterior_mean(y_pred, quantiles, quantile_axis=1)
             dy_mean = mean - y
@@ -312,9 +321,6 @@ def evaluate(data,
             dy_means += [dy_mean.to(cpu).squeeze(1)]
             dy_medians += [dy_mean.to(cpu).squeeze(1)]
             ys += [y.to(cpu).squeeze(1)]
-
-            print(ys[-1].shape)
-
 
             #shape[1] = -1
             calibration += (y < y_pred).sum((0, 2, 3))
@@ -629,9 +635,10 @@ class GPROFConvDataset:
 
                 p_in = np.random.uniform(-1, 1)
                 p_out = np.random.uniform(-1, 1)
+                s_o = np.random.uniform(-1, 1)
 
-                self.x[i] = np.transpose(extract_subscene(bt[i], p_in, p_out), [2, 0, 1])
-                self.y[i] = extract_subscene(sp[i], p_in, p_out)
+                self.x[i] = np.transpose(extract_subscene(bt[i], p_in, p_out, s_o), [2, 0, 1])
+                self.y[i] = extract_subscene(sp[i], p_in, p_out, s_o)
 
 
                 r = np.random.rand()
@@ -645,6 +652,35 @@ class GPROFConvDataset:
                 if (r > 0.5):
                     self.x[i] = np.flip(self.x[i], axis=1)
                     self.y[i] = np.flip(self.y[i], axis=0)
+        self.y[np.isnan(self.y)] = -1.0
+
+    def get_surface_types(self):
+        """
+        Get surface types for non-augmented (validation) data.
+        """
+        with Dataset(self.filename, "r") as dataset:
+
+            variables = dataset.variables
+            n = dataset.dimensions["samples"].size
+            h = dataset.dimensions["scans"].size
+            w = dataset.dimensions["pixels"].size
+            c = dataset.dimensions["channels"].size
+
+            #
+            # Input data
+            #
+
+            # Brightness temperatures
+            st = np.zeros((n, 128, 128), np.int8)
+
+            index_start = 0
+            chunk_size = 128
+            v = dataset["surface_type"]
+            while index_start < n:
+                index_end = index_start + chunk_size
+                st[index_start: index_end] = v[index_start: index_end, 110-64:110+64, 110-64:110+64].data
+                index_start += chunk_size
+            return st
 
 
     def _shuffle(self):
@@ -693,3 +729,82 @@ class GPROFConvDataset:
         else:
             return self.x.shape[0]
 
+
+    def evaluate(self,
+                 model,
+                 surface_types,
+                 batch_size=16384,
+                 device=torch.device("cuda")):
+        """
+        Run retrieval on dataset.
+        """
+        n_samples = self.x.shape[0]
+        y_means = []
+        y_medians = []
+        dy_means = []
+        dy_medians = []
+        pops = []
+        y_trues = []
+        surfaces = []
+        airmasses = []
+
+        st_indices = torch.arange(19).reshape(1, -1).to(device)
+        am_indices = torch.arange(4).reshape(1, -1).to(device)
+        i_start = 0
+        model.model.to(device)
+
+        with torch.no_grad():
+            for i in tqdm(range(n_samples // batch_size + 1)):
+                i_start = i * batch_size
+                i_end = i_start + batch_size
+                sts = surface_types[i_start:i_end]
+                if i_start >= n_samples:
+                    break
+
+                x = torch.tensor(self.x[i_start:i_end]).float().to(device)
+                y = torch.tensor(self.y[i_start:i_end]).float().to(device)
+                i_start += batch_size
+
+                y_pred = model.predict(x)
+                y_mean = model.posterior_mean(y_pred=y_pred)
+                dy_mean = y_mean - y
+                y_median = model.posterior_quantiles(y_pred=y_pred, quantiles=[0.5]).squeeze(1)
+                dy_median = y_median - y
+
+                y_mean = y_mean.cpu().numpy()
+                dy_mean = dy_mean.cpu().numpy()
+                y_median = y_median.cpu().numpy()
+                dy_median = dy_median.cpu().numpy()
+                y_true = y.cpu().numpy()
+                pop = model.probability_larger_than(y_pred=y_pred, y=1e-2).cpu().numpy()
+
+                indices = y_true[:, :, :] >= 0.0
+                y_means.append(y_mean[indices])
+                y_medians.append(y_median[indices])
+                dy_means.append(dy_mean[indices])
+                dy_medians.append(dy_median[indices])
+                y_trues.append(y_true[indices])
+                pops.append(pop[indices])
+                surfaces.append(sts[indices])
+
+
+        y_means = np.concatenate(y_means, 0)
+        y_medians = np.concatenate(y_medians, 0)
+        dy_means = np.concatenate(dy_means, 0)
+        dy_medians = np.concatenate(dy_medians, 0)
+        pop = np.concatenate(pops, 0)
+        y_trues = np.concatenate(y_trues, 0)
+        surfaces = np.concatenate(surfaces, 0)
+
+        dims = ["samples"]
+
+        data = {
+            "y_mean": (dims, y_means),
+            "y_median": (dims, y_medians),
+            "dy_mean": (dims, dy_means),
+            "dy_median": (dims, dy_medians),
+            "y": (dims, y_trues),
+            "surface_type": (dims, surfaces),
+            "pop": (dims, surface)
+            }
+        return xarray.Dataset(data)
