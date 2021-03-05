@@ -522,6 +522,7 @@ class GPROFConvDataset:
                  target="surface_precip",
                  normalize=True,
                  transform_zero_rain=True,
+                 transform_log=False,
                  batch_size=None,
                  normalizer=None,
                  shuffle=True,
@@ -559,6 +560,9 @@ class GPROFConvDataset:
         if transform_zero_rain:
             self._transform_zero_rain()
 
+        if transform_log:
+            self._transform_log()
+
         self.x = self.x.astype(np.float32)
         self.y = self.y.astype(np.float32)
 
@@ -581,10 +585,17 @@ class GPROFConvDataset:
         indices = (self.y < 1e-4) * (self.y >= 0.0)
         self.y[indices] = np.random.uniform(1e-6, 1.0e-4, indices.sum())
 
+    def _transform_log(self):
+        indices = (self.y < 0.0)
+        self.y = np.log10(self.y)
+        self.y[indices] = -10
+
+
     def _load_data(self):
         """
         Loads the data from the file into the classes ``x`` attribute.
         """
+
         with Dataset(self.filename, "r") as dataset:
 
             LOGGER.info("Loading data from file: %s",
@@ -805,6 +816,6 @@ class GPROFConvDataset:
             "dy_median": (dims, dy_medians),
             "y": (dims, y_trues),
             "surface_type": (dims, surfaces),
-            "pop": (dims, surface)
+            "pop": (dims, pop)
             }
         return xarray.Dataset(data)
