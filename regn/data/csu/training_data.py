@@ -745,7 +745,8 @@ class GPROFConvDataset:
                  model,
                  surface_types,
                  batch_size=16384,
-                 device=torch.device("cuda")):
+                 device=torch.device("cuda"),
+                 log=False):
         """
         Run retrieval on dataset.
         """
@@ -763,6 +764,7 @@ class GPROFConvDataset:
         am_indices = torch.arange(4).reshape(1, -1).to(device)
         i_start = 0
         model.model.to(device)
+        print(log)
 
         with torch.no_grad():
             for i in tqdm(range(n_samples // batch_size + 1)):
@@ -777,6 +779,8 @@ class GPROFConvDataset:
                 i_start += batch_size
 
                 y_pred = model.predict(x)
+                if log:
+                    y_pred = torch.exp(np.log(10) * y_pred)
                 y_mean = model.posterior_mean(y_pred=y_pred)
                 dy_mean = y_mean - y
                 y_median = model.posterior_quantiles(y_pred=y_pred, quantiles=[0.5]).squeeze(1)
