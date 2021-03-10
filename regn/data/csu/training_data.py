@@ -3,26 +3,35 @@
 regn.data.csu.training_data
 ===========================
 
-This module provides an interface to the GPROF training data.
+This module provides interface class to load the training and evaluation
+ data for the NN-based GPROF algorithms.
 """
 import logging
-LOGGER = logging.getLogger(__name__)
 
 from netCDF4 import Dataset
 import numpy as np
 import torch
+from tqdm import tqdm
+import xarray
+
 from quantnn.normalizer import MinMaxNormalizer, Normalizer
 from quantnn.drnn import _to_categorical
 import quantnn.quantiles as qq
 import quantnn.density as qd
-from tqdm import tqdm
-import xarray
 
 from regn.data.augmentation import extract_subscene, mask_stripe
 
+LOGGER = logging.getLogger(__name__)
+
+###############################################################################
+# Single-pixel observations.
+###############################################################################
+
 class GPROFDataset:
     """
-    Dataset interface to load GPROF data from NetCDF file.
+    Dataset class providing an interface for the single-pixel GPROF
+    training dataset mapping TBs and ancillary data to surface precip
+    values.
 
     Attributes:
         x: Rank-2 tensor containing the input data with
@@ -88,7 +97,6 @@ class GPROFDataset:
         self._shuffled = False
         if self.shuffle:
             self._shuffle()
-
 
     def _transform_zero_rain(self):
         """
@@ -169,6 +177,8 @@ class GPROFDataset:
         Args:
             i(int): The index of the sample to return
         """
+        if i >= len(self):
+            raise IndexError()
 
         self._shuffled = False
         if self.batch_size is None:
@@ -178,16 +188,15 @@ class GPROFDataset:
         i_start = self.batch_size * i
         i_end = self.batch_size * (i + 1)
 
+        x = torch.tensor(self.x[i_start:i_end, :])
+        y = torch.tensor(self.y[i_start:i_end])
+
         if i + 1 == len(self):
-            print("shufflin' ...")
             self._shuffle()
             if not self.binned:
                 self._transform_zero_rain()
 
-        if i >= len(self):
-            raise IndexError()
-        return (torch.tensor(self.x[i_start:i_end, :]),
-                torch.tensor(self.y[i_start:i_end]))
+        return x, y
 
     def __len__(self):
         """
@@ -268,6 +277,55 @@ class GPROFDataset:
             "dy_median": (dims, dy_medians),
             "y": (dims, y_trues),
             "pop": (dims, pops),
+            "surface_type": (dims, surfaces),
+            "airmass_type": (dims, airmasses)
+            }
+        return xarray.Dataset(data)
+
+    def evaulate_sensitivity(self,
+                             model,
+                             batch_size=512,
+                             device=torch.device("cuda")):
+        """
+        Run retrieval on dataset.
+        """
+        grads = []
+        surfaces = []
+        airmasses = []
+
+        st_indices = torch.arange(19).reshape(1, -1).to(device)
+        am_indices = torch.arange(4).reshape(1, -1).to(device)
+        i_start = 0
+        model.model.to(device)
+
+        for i in tqdm(range(n_samples // batch_size + 1)):
+            i_start = i * batch_size
+            i_end = i_start + batch_size
+            if i_start >= n_samples:
+                break
+
+            model.model.zero_grad()
+
+            x = torch.tensor(self.x[i_start:i_end]).float().to(device)
+            y = torch.tensor(self.y[i_start:i_end]).float().to(device)
+            i_start += batch_size
+
+            y_pred = model.predict(x)
+            y_mean = model.posterior_mean(y_pred=y_pred).reshape(-1)
+
+            y_mean.backward()
+            grads.append(x.grad[:, :15].cpu())
+            surfaces += [(x[:, 17:36] * st_indices).sum(1).cpu()]
+            airmasses += [(x[:, 36:] * am_indices).sum(1).cpu()]
+
+        grads = torch.cat(grads, 0).detach().numpy()
+        surfaces = torch.cat(surfaces, 0).detach().numpy()
+        airmasses = torch.cat(airmasses, 0).detach().numpy()
+
+        dims = ["samples"]
+
+        data = {
+            "y_mean": (dims + ("channels",), grads),
             "surface_type": (dims, surfaces),
             "airmass_type": (dims, airmasses)
             }
@@ -464,43 +522,6 @@ def evaluate_drnn(data,
     del y_pred
 
     return xarray.Dataset(data)
-
-import math
-
-def _pixel_offset(pixel_index):
-    a = 30 / 110 ** 2
-    b = 110
-    offset = a * (pixel_index - b) ** 2
-    return offset
-
-
-def _extract_subscene(input_data, p_in, p_out):
-    """
-    Data augmentation function that extracts 164 x 164 patches from larger
-    patch and transforms the data to simulate retrievals at different regions
-    of the swath.
-    """
-    p_in = np.clip(p_in, -1.0, 1.0)
-    p_out = np.clip(p_out, -1.0, 1.0)
-    c_in = int(110  + 0.5 * (157 - 65) * p_in)
-    c_out = int(110  + 0.5 * (157 - 65) * p_out)
-
-    offsets_in = _pixel_offset(np.arange(c_in - 64, c_in + 64))
-    offsets_out = _pixel_offset(np.arange(c_out - 64, c_out + 64))
-
-    out = np.zeros_like(input_data, shape=input_data.shape[:-2] + (128, 128))
-    scan_start = 57
-    for i in range(128):
-        o_in = offsets_in[i]
-        o_out = offsets_out[i]
-        d_o = o_out - o_in
-
-        i_start = math.floor(scan_start + d_o)
-        c = scan_start + d_o - i_start
-
-        out[..., :, i] = (1.0 - c) * input_data[..., i_start:i_start + 128, c_in - 64 + i]
-        out[..., :, i] += c * input_data[..., i_start + 1:i_start + 129, c_in - 64 + i]
-    return out
 
 
 class GPROFConvDataset:
@@ -719,16 +740,17 @@ class GPROFConvDataset:
         i_start = self.batch_size * i
         i_end = self.batch_size * (i + 1)
 
+        x = torch.tensor(self.x[i_start:i_end])
+        y = torch.tensor(self.y[i_start:i_end])
+
         if i + 1 == len(self):
-            print("shufflin' ...")
             self._shuffle()
             if not self.binned:
                 self._transform_zero_rain()
 
         if i >= len(self):
             raise IndexError()
-        return (torch.tensor(self.x[i_start:i_end]),
-                torch.tensor(self.y[i_start:i_end]))
+        return x, y
 
     def __len__(self):
         """
