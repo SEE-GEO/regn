@@ -10,6 +10,7 @@ from quantnn.qrnn import QRNN
 from quantnn.models.pytorch.xception import XceptionFpn
 
 from regn.data.csu.training_data import (GPROFDataset,
+                                         GPROFValidationDataset,
                                          GPROFConvDataset)
 
 
@@ -49,7 +50,7 @@ def test_evaluate_simple():
     """
     path = Path(__file__).parent
     input_file = path / "data" / "dataset_simple.nc"
-    dataset = GPROFDataset(input_file, batch_size=2)
+    dataset = GPROFValidationDataset(input_file, batch_size=2)
     quantiles = np.linspace(0.01, 0.99, 99)
     qrnn = QRNN(quantiles, n_inputs=40)
     results = dataset.evaluate(qrnn)

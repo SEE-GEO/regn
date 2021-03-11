@@ -289,6 +289,8 @@ class GPROFDataset:
         Run retrieval on dataset.
         """
         n_samples = self.x.shape[0]
+        y_means = []
+        y_trues = []
         grads = []
         surfaces = []
         airmasses = []
@@ -300,11 +302,7 @@ class GPROFDataset:
 
         loss = torch.nn.MSELoss()
 
-        def fun(x):
-            y_pred = model.model(x)
-            y_mean = model.posterior_mean(y_pred=y_pred).reshape(-1)
-            return y_mean
-
+        model.model.eval()
 
         for i in tqdm(range(n_samples // batch_size + 1)):
             i_start = i * batch_size
@@ -321,15 +319,18 @@ class GPROFDataset:
             y.requires_grad = True
             i_start += batch_size
 
-            y_pred = model.model(x)
+            y_pred = model.predict(x)
             y_mean = model.posterior_mean(y_pred=y_pred).reshape(-1)
             torch.sum(y_mean).backward()
 
-
+            y_means.append(y_mean.detach().cpu())
+            y_trues.append(y.detach().cpu())
             grads.append(x.grad[:, :15].cpu())
             surfaces += [(x[:, 17:36] * st_indices).sum(1).cpu()]
             airmasses += [(x[:, 36:] * am_indices).sum(1).cpu()]
 
+        y_means = torch.cat(y_means, 0).detach().numpy()
+        y_trues = torch.cat(y_trues, 0).detach().numpy()
         grads = torch.cat(grads, 0).detach().numpy()
         surfaces = torch.cat(surfaces, 0).detach().numpy()
         airmasses = torch.cat(airmasses, 0).detach().numpy()
@@ -340,8 +341,41 @@ class GPROFDataset:
             "gradients": (dims + ["channels",], grads),
             "surface_type": (dims, surfaces),
             "airmass_type": (dims, airmasses),
+            "y_mean": (dims, y_means),
+            "y_true": (dims, y_trues)
         }
         return xarray.Dataset(data)
+
+class GPROFValidationDataset(GPROFDataset):
+    """
+    Specialization of the GPROF single-pixel dataset to be used for
+    validation. This class will neither shuffle the data nor replace
+    zero values by zero and will add geolocation information to the
+    evaluation results.
+
+
+    Attributes:
+        lats: Vector containing the latitude of each sample in the
+             validation data set.
+        lons: Vector containing the longitude of each sample in the
+             validation data set.
+    """
+    def __init__(
+        self,
+        filename,
+        target="surface_precip",
+        normalize=True,
+        batch_size=None,
+        normalizer=None,
+    ):
+        super().__init__(filename,
+                         target=target,
+                         normalize=normalize,
+                         transform_zero_rain=False,
+                         batch_size=batch_size,
+                         normalizer=normalizer,
+                         shuffle=False,
+                         bins=None)
 
 ###############################################################################
 # Convolutional dataset
