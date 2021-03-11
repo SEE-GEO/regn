@@ -22,7 +22,7 @@ validation_data = args.validation_data[0]
 models = args.models
 
 normalizer = Normalizer.load(
-    "sftp://129.16.35.202/mnt/array1/share/Datasets/"
+    "sftp://129.16.35.202/mnt/array1/share/MLDatasets/"
     "gprof/simple/gprof_gmi_normalizer.pckl"
 )
 
@@ -36,5 +36,5 @@ for m in models:
     results.attrs["model"] = Path(m).name
 
     model_path = Path(m)
-    output_file = model_path.parent / model_path.stem + ".nc"
+    output_file = model_path.parent / (model_path.stem + ".nc")
     results.to_netcdf(output_file)
