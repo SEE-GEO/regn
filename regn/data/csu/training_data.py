@@ -241,11 +241,6 @@ class GPROFDataset:
                 y_pred = model.predict(x)
                 y_mean = model.posterior_mean(y_pred=y_pred).reshape(-1)
                 dy_mean = y_mean - y
-                print(
-                model.posterior_quantiles(
-                    y_pred=y_pred, quantiles=[0.5]
-                ).shape
-                    )
                 y_median = model.posterior_quantiles(
                     y_pred=y_pred, quantiles=[0.5]
                 ).squeeze(1)
@@ -653,7 +648,6 @@ class GPROFConvDataset:
         am_indices = torch.arange(4).reshape(1, -1).to(device)
         i_start = 0
         model.model.to(device)
-        print(log)
 
         with torch.no_grad():
             for i in tqdm(range(n_samples // batch_size + 1)):
