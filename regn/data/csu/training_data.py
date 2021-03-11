@@ -220,6 +220,7 @@ class GPROFDataset:
         y_trues = []
         surfaces = []
         airmasses = []
+        y_samples = []
 
         st_indices = torch.arange(19).reshape(1, -1).to(device)
         am_indices = torch.arange(4).reshape(1, -1).to(device)
@@ -248,8 +249,10 @@ class GPROFDataset:
                 y_median = model.posterior_quantiles(
                     y_pred=y_pred, quantiles=[0.5]
                 ).squeeze(1)
+                y_sample = model.sample_posterior(y_pred=y_pred).squeeze(1)
                 dy_median = y_median - y
 
+                y_samples.append(y_sample.cpu())
                 y_means.append(y_mean.cpu())
                 dy_means.append(dy_mean.cpu())
                 y_medians.append(y_median.cpu())
@@ -263,6 +266,7 @@ class GPROFDataset:
 
         y_means = torch.cat(y_means, 0).detach().numpy()
         y_medians = torch.cat(y_medians, 0).detach().numpy()
+        y_samples = torch.cat(y_samples, 0).detach().numpy()
         dy_means = torch.cat(dy_means, 0).detach().numpy()
         dy_medians = torch.cat(dy_medians, 0).detach().numpy()
         pops = torch.cat(pops, 0).detach().numpy()
@@ -274,6 +278,7 @@ class GPROFDataset:
 
         data = {
             "y_mean": (dims, y_means),
+            "y_sampled": (dims, y_samples),
             "y_median": (dims, y_medians),
             "dy_mean": (dims, dy_means),
             "dy_median": (dims, dy_medians),
