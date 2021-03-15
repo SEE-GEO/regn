@@ -107,8 +107,11 @@ class GPROFGMIBinFile:
                                   offset=GMI_BIN_HEADER_TYPES.itemsize)
         self.n_profiles = self.handle.shape[0]
 
-        np.random.seed([self.temperature, self.tpw, self.surface_type, self.airmass_type])
-        self.indices = np.random.permuation(self.n_profiles)
+        np.random.seed(np.array([(self.temperature),
+                                 self.tpw,
+                                 self.surface_type,
+                                 self.airmass_type]).astype(np.int64))
+        self.indices = np.random.permutation(self.n_profiles)
 
     def get_attributes(self):
         """
