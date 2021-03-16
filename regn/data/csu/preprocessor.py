@@ -97,7 +97,7 @@ def write_orbit_header(output,
 
     if template is not None:
         for k in DATA_RECORD_TYPES.fields:
-            new_header[k] = template[k]
+            new_header[k] = template.orbit_header[k]
     else:
         new_header = np.recarray(1, dtype=ORBIT_HEADER_TYPES)
         new_header["satellite"] = "GPM CO"
@@ -175,7 +175,6 @@ class PreprocessorFile:
         self.orbit_header = np.frombuffer(self.data, ORBIT_HEADER_TYPES, count=1)
         self.n_scans = self.orbit_header["number_of_scans"][0]
         self.n_pixels = self.orbit_header["number_of_pixels"][0]
-        print(self.n_scans, self.n_pixels)
 
     @property
     def satellite(self):
