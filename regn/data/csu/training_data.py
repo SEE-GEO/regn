@@ -35,7 +35,7 @@ def write_preprocessor_file(input_file, output_file, n_samples=None):
         output_file: Path of the file to write the output to.
         n_samples: How many samples to extract from the training data file.
     """
-    data = xr.load_dataset(input_file)
+    data = xr.open_dataset(input_file)
     new_names = {
         "samples": "pixels",
         "brightness_temps": "brightness_temperatures"
