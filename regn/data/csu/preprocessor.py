@@ -82,7 +82,9 @@ DATA_RECORD_TYPES = np.dtype(
     ]
 )
 
-def write_orbit_header(output, data):
+def write_orbit_header(output,
+                       data,
+                       template=None):
     """
     Write header for custom preprocessor file.
 
@@ -92,17 +94,23 @@ def write_orbit_header(output, data):
              the file handle.
     """
     new_header = np.recarray(1, dtype=ORBIT_HEADER_TYPES)
-    new_header["satellite"] = "GPM CO"
-    new_header["sensor"] = "GMI"
-    new_header["preprocessor"] = "NONE"
-    new_header["profile_database_file"] = "NONE"
-    new_header["radiometer_file"] = "NONE"
-    new_header["calibration_file"] = "NONE"
-    new_header["granule_number"] = 0
+
+    if template is not None:
+        for k in DATA_RECORD_TYPES.fields:
+            new_header[k] = template[k]
+    else:
+        new_header = np.recarray(1, dtype=ORBIT_HEADER_TYPES)
+        new_header["satellite"] = "GPM CO"
+        new_header["sensor"] = "GMI"
+        new_header["preprocessor"] = "NONE"
+        new_header["profile_database_file"] = "NONE"
+        new_header["radiometer_file"] = "NONE"
+        new_header["calibration_file"] = "NONE"
+        new_header["granule_number"] = 0
+        new_header["n_channels"] = 15
+        new_header["comment"] = "Custom preprocessor file for verification."
     new_header["number_of_scans"] = data.scans.size
     new_header["number_of_pixels"] = data.pixels.size
-    new_header["n_channels"] = 15
-    new_header["comment"] = "Custom preprocessor file for verification."
     new_header.tofile(output)
 
 def write_scan_header(output):
@@ -144,10 +152,10 @@ class PreprocessorFile:
         n_pixels: The number of pixels in the file.
     """
     @classmethod
-    def write(cls, filename, data):
+    def write(cls, filename, data, template=None):
         n_scans = data.scans.size
         with open(filename, "wb") as output:
-            write_orbit_header(output, data)
+            write_orbit_header(output, data, template=template)
             for i in range(n_scans):
                 scan_data = data[{"scans": i}]
                 write_scan_header(output)
