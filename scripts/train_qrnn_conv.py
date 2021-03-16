@@ -28,7 +28,11 @@ parser.add_argument('validation_data_path',
                     help='Path to validation data.')
 parser.add_argument('model_path', metavar='model_path', type=str, nargs=1,
                     help='Where to store the model.')
+<<<<<<< HEAD
 parser.add_argument('--device', metavar='device', type=str, default="cuda")
+=======
+parser.add_argument('--device', metavar='device', type=str, default="cuda", nargs=1)
+>>>>>>> 649864b4495ae4c64b1fac6263d9348fa1aab54f
 
 args = parser.parse_args()
 training_path = args.training_data_path[0]
@@ -72,7 +76,12 @@ qrnn.train(training_data=training_data,
            n_epochs=n_epochs,
            optimizer=optimizer,
            scheduler=scheduler,
+<<<<<<< HEAD
            device=device)
+=======
+           device=device,
+           mask=-1.0)
+>>>>>>> 649864b4495ae4c64b1fac6263d9348fa1aab54f
 qrnn.save(model_path / network_name)
 
 n_epochs=10
@@ -83,7 +92,12 @@ qrnn.train(training_data=training_data,
            n_epochs=n_epochs,
            optimizer=optimizer,
            scheduler=scheduler,
+<<<<<<< HEAD
            device=device)
+=======
+           device=device,
+           mask=-1.0)
+>>>>>>> 649864b4495ae4c64b1fac6263d9348fa1aab54f
 qrnn.save(model_path / network_name)
 
 n_epochs=20
@@ -94,7 +108,12 @@ qrnn.train(training_data=training_data,
            n_epochs=n_epochs,
            optimizer=optimizer,
            scheduler=scheduler,
+<<<<<<< HEAD
            device=device)
+=======
+           device=device,
+           mask=-1.0)
+>>>>>>> 649864b4495ae4c64b1fac6263d9348fa1aab54f
 qrnn.save(model_path / network_name)
 n_epochs=20
 optimizer = optim.SGD(model.parameters(), lr=0.1)
@@ -104,7 +123,12 @@ qrnn.train(training_data=training_data,
            n_epochs=n_epochs,
            optimizer=optimizer,
            scheduler=scheduler,
+<<<<<<< HEAD
            device=device)
+=======
+           device=device,
+           mask=-1.0)
+>>>>>>> 649864b4495ae4c64b1fac6263d9348fa1aab54f
 qrnn.save(model_path / network_name)
 
 

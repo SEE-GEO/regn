@@ -11,6 +11,7 @@ from regn.data.csu.preprocessor import PreprocessorFile
 import numpy as np
 import quantnn.quantiles as qq
 import xarray
+import torch
 
 N_CHANNELS = 15
 
@@ -71,6 +72,38 @@ class InputData(Dataset):
         x = np.concatenate([bts, t2m, tcwv, st_1h, am_1h], axis=1)
         return self.normalizer(x)
 
+    def get_conv_input(self, i):
+
+        m = 32 * int((self.n_scans / 32 + 0.5))
+        dm = m - self.n_scans
+
+        n = 32 * int((self.n_pixels / 32 + 0.5))
+        dn = n - self.n_pixels
+
+
+        p_m_l = dm // 2
+        p_m_r = dm - p_m_l
+        p_n_l = dn // 2
+        p_n_r = dn - p_n_l
+
+        print(p_n_l, p_n_r, p_m_l, p_m_r)
+
+        bts = self.data["brightness_temperatures"].data.copy()
+        bts[bts < 0.0] = np.nan
+        bts[bts > 500.0] = np.nan
+
+        mask = np.isnan(bts[:, :, 10])
+        #bts[:, :, 9][mask] = np.nan
+
+        x = torch.zeros(1, 15, self.n_scans, self.n_pixels)
+        for i in range(15):
+            x[0, i] = torch.tensor(bts[:, :, i])
+
+        x = torch.nn.functional.pad(x, [p_n_l, p_n_r, p_m_l, p_m_r], "reflect")
+
+        return x
+
+
     def run_retrieval(self, qrnn):
         quantiles = qrnn.quantiles
 
@@ -80,24 +113,26 @@ class InputData(Dataset):
         second_tertial = np.zeros((self.n_scans, self.n_pixels))
         pop = np.zeros((self.n_scans, self.n_pixels))
 
-        for i in range(len(self)):
-            x = self[i]
-            y = qrnn.predict(x)
+        with torch.no_grad():
+            for i in range(len(self)):
+                print(i, len(self))
+                x = self[i]
+                y = qrnn.predict(x)
 
-            i_start = i * self.scans_per_batch
-            i_end = (i + 1) * self.scans_per_batch
-            y_pred[i_start:i_end, :, :] = y.reshape(-1, self.n_pixels, len(quantiles))
+                i_start = i * self.scans_per_batch
+                i_end = (i + 1) * self.scans_per_batch
+                y_pred[i_start:i_end, :, :] = y.reshape(-1, self.n_pixels, len(quantiles)).numpy()
 
-            means = qq.posterior_mean(y, quantiles, quantile_axis=1)
-            mean[i_start:i_end] = means.reshape(-1, self.n_pixels)
+                means = qrnn.posterior_mean(y_pred=y)
+                mean[i_start:i_end] = means.reshape(-1, self.n_pixels).numpy()
 
-            t = qq.posterior_quantiles(y, quantiles, [0.333], quantile_axis=1)
-            first_tertial[i_start:i_end] = t.reshape(-1, self.n_pixels)
-            t = qq.posterior_quantiles(y, quantiles, [0.666], quantile_axis=1)
-            second_tertial[i_start:i_end] = t.reshape(-1, self.n_pixels)
+                t = qrnn.posterior_quantiles(y_pred=y, quantiles=[0.333])
+                first_tertial[i_start:i_end] = t.reshape(-1, self.n_pixels).numpy()
+                t = qrnn.posterior_quantiles(y_pred=y, quantiles=[0.666])
+                second_tertial[i_start:i_end] = t.reshape(-1, self.n_pixels).numpy()
 
-            p =  qq.probability_larger_than(y, quantiles, 0.01, quantile_axis=1)
-            pop[i_start:i_end] = p.reshape(-1, self.n_pixels)
+                p = qrnn.probability_larger_than(y_pred=y, y=0.01)
+                pop[i_start:i_end] = p.reshape(-1, self.n_pixels).numpy()
 
 
         dims = ["scans", "pixels", "quantiles"]
