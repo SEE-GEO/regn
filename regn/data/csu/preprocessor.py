@@ -96,7 +96,7 @@ def write_orbit_header(output,
     new_header = np.recarray(1, dtype=ORBIT_HEADER_TYPES)
 
     if template is not None:
-        for k in DATA_RECORD_TYPES.fields:
+        for k in ORBIT_HEADER_TYPES.fields:
             new_header[k] = template.orbit_header[k]
     else:
         new_header = np.recarray(1, dtype=ORBIT_HEADER_TYPES)
