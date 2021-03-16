@@ -6,12 +6,16 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import xarray as xr
+
 from quantnn.qrnn import QRNN
 from quantnn.models.pytorch.xception import XceptionFpn
 
 from regn.data.csu.training_data import (GPROFDataset,
                                          GPROFValidationDataset,
-                                         GPROFConvDataset)
+                                         GPROFConvDataset,
+                                         write_preprocessor_file)
+from regn.data.csu.preprocessor import PreprocessorFile
 
 
 def test_gprof_dataset():
@@ -128,4 +132,21 @@ def test_evaluate_conv():
     assert "dy_median" in results
     assert "y" in results
     assert "surface_type" in results
+
+def test_write_preprocessor_file(tmp_path):
+    path = Path(__file__).parent
+    input_file = path / "data" / "dataset_simple.nc"
+    output_file = tmp_path / "test.pp"
+    write_preprocessor_file(input_file, output_file)
+
+    input_data = xr.load_dataset(input_file)
+    output_data = PreprocessorFile(output_file).to_xarray_dataset()
+
+    assert np.all(np.isclose(
+        input_data["brightness_temps"].data,
+        output_data["brightness_temperatures"].data
+    ))
+
+
+
 

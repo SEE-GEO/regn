@@ -121,6 +121,7 @@ DATA_RECORD_TYPES_SENSITIVITY = np.dtype(
 
      ("surface_precip", "f4"),
      ("surface_precip_1", "f4"),
+     ("surface_precip_2", "f4"),
      ("dsurface_precip_dy", "15f4"),
      ("frozen_precip", "f4"),
      ("convective_precip", "f4"),
@@ -147,7 +148,7 @@ class RetrievalFile:
     def __init__(self, filename, has_sensitivity=False):
         filename = Path(filename)
         self.filename = filename
-        if filename.suffix == "gz":
+        if filename.suffix == ".gz":
             with gzip.open(filename, "rb") as file:
                 self.data = file.read()
         else:
@@ -260,7 +261,8 @@ class RetrievalFile:
 
         dims = ["scans", "pixels", "channels"]
         data = {k: (dims[:len(d.shape)], d) for k, d in data.items()
-                if not k.startswith("profile")}
+                if not k.startswith("profile")
+                }
         return xarray.Dataset(data)
 
 
