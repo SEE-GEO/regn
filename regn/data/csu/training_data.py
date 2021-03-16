@@ -12,7 +12,7 @@ from netCDF4 import Dataset
 import numpy as np
 import torch
 from tqdm import tqdm
-import xarray
+import xarray as xr
 
 from quantnn.normalizer import MinMaxNormalizer, Normalizer
 from quantnn.drnn import _to_categorical
@@ -20,14 +20,37 @@ import quantnn.quantiles as qq
 import quantnn.density as qd
 
 from regn.data.augmentation import extract_subscene, mask_stripe
+from regn.data.csu.preprocessor import PreprocessorFile
 
 LOGGER = logging.getLogger(__name__)
+
+
+def write_preprocessor_file(input_file, output_file, n_samples=None):
+    """
+    Extract sample from training data file and write to preprocessor format.
+
+    Args:
+        input_file: Path to the NetCDF4 file containing the training or test
+            data.
+        output_file: Path of the file to write the output to.
+        n_samples: How many samples to extract from the training data file.
+    """
+    data = xr.load_dataset(input_file)
+    new_names = {
+        "samples": "pixels",
+        "brightness_temps": "brightness_temperatures"
+    }
+    data = data[{"samples": slice(0, n_samples)}]
+    data = data.rename(new_names).expand_dims("scans")
+    shape = (data.scans.size, data.pixels.size, data.channel.size)
+    eia = np.broadcast_to(data.attrs["nominal_eia"].reshape(1, 1, -1), shape)
+    data["earth_incidence_angle"] = (("scans", "pixels", "channel"), eia)
+    PreprocessorFile.write(output_file, data)
+
 
 ###############################################################################
 # Single-pixel observations.
 ###############################################################################
-
-
 class GPROFDataset:
     """
     Dataset class providing an interface for the single-pixel GPROF
@@ -282,7 +305,7 @@ class GPROFDataset:
             "surface_type": (dims, surfaces),
             "airmass_type": (dims, airmasses),
         }
-        return xarray.Dataset(data)
+        return xr.Dataset(data)
 
     def evaluate_sensitivity(self, model, batch_size=512, device=torch.device("cuda")):
         """
@@ -344,7 +367,7 @@ class GPROFDataset:
             "y_mean": (dims, y_means),
             "y_true": (dims, y_trues)
         }
-        return xarray.Dataset(data)
+        return xr.Dataset(data)
 
 class GPROFValidationDataset(GPROFDataset):
     """
@@ -706,4 +729,4 @@ class GPROFConvDataset:
             "surface_type": (dims, surfaces),
             "pop": (dims, pop),
         }
-        return xarray.Dataset(data)
+        return xr.Dataset(data)
