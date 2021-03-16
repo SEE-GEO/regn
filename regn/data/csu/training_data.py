@@ -25,7 +25,10 @@ from regn.data.csu.preprocessor import PreprocessorFile
 LOGGER = logging.getLogger(__name__)
 
 
-def write_preprocessor_file(input_file, output_file, n_samples=None):
+def write_preprocessor_file(input_file,
+                            output_file,
+                            n_samples=None,
+                            template=None):
     """
     Extract sample from training data file and write to preprocessor format.
 
@@ -34,6 +37,9 @@ def write_preprocessor_file(input_file, output_file, n_samples=None):
             data.
         output_file: Path of the file to write the output to.
         n_samples: How many samples to extract from the training data file.
+        template: Template preprocessor file use to determine the orbit header
+             information. If not provided this data will be filled with dummy
+             values.
     """
     data = xr.open_dataset(input_file)
     new_names = {
@@ -45,7 +51,7 @@ def write_preprocessor_file(input_file, output_file, n_samples=None):
     shape = (data.scans.size, data.pixels.size, data.channel.size)
     eia = np.broadcast_to(data.attrs["nominal_eia"].reshape(1, 1, -1), shape)
     data["earth_incidence_angle"] = (("scans", "pixels", "channel"), eia)
-    PreprocessorFile.write(output_file, data)
+    PreprocessorFile.write(output_file, data, template=template)
 
 
 ###############################################################################
