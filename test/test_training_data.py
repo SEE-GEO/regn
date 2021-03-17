@@ -14,6 +14,7 @@ from quantnn.models.pytorch.xception import XceptionFpn
 from regn.data.csu.training_data import (GPROFDataset,
                                          GPROFValidationDataset,
                                          GPROFConvDataset,
+                                         GPROFConvValidationDataset,
                                          write_preprocessor_file)
 from regn.data.csu.preprocessor import PreprocessorFile
 
@@ -119,12 +120,11 @@ def test_evaluate_conv():
     """
     path = Path(__file__).parent
     input_file = path / "data" / "dataset_conv.nc"
-    dataset = GPROFConvDataset(input_file, batch_size=1)
+    dataset = GPROFConvValidationDataset(input_file, batch_size=1)
     quantiles = np.linspace(0.01, 0.99, 99)
     model = XceptionFpn(15, 99)
     qrnn = QRNN(quantiles, model=model)
-    surface_types = dataset.get_surface_types()
-    results = dataset.evaluate(qrnn, surface_types)
+    results = dataset.evaluate(qrnn)
 
     assert "y_mean" in results
     assert "y_median" in results

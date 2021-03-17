@@ -238,7 +238,17 @@ class GPROFDataset:
 
     def evaluate(self, model, batch_size=16384, device=torch.device("cuda")):
         """
-        Run retrieval on dataset.
+        Run retrieval on test dataset and returns results as
+        xarray Dataset.
+
+        Args:
+            model: The QRNN or DRNN model to evaluate.
+            batch_size: The batch size to use for the evaluation.
+            device: On which device to run the evaluation.
+
+        Return:
+            ``xarray.Dataset`` containing the predicted and reference values
+            for the data in this dataset.
         """
         n_samples = self.x.shape[0]
         y_means = []
@@ -305,8 +315,7 @@ class GPROFDataset:
             "y_sampled": (dims, y_samples),
             "y_median": (dims, y_medians),
             "dy_mean": (dims, dy_means),
-            "dy_median": (dims, dy_medians),
-            "y": (dims, y_trues),
+            "dy_median": (dims, dy_medians), "y": (dims, y_trues),
             "pop": (dims, pops),
             "surface_type": (dims, surfaces),
             "airmass_type": (dims, airmasses),
@@ -661,11 +670,26 @@ class GPROFConvDataset:
         log=False,
     ):
         """
-        Run retrieval on dataset.
+        Run retrieval on test dataset and returns results as
+        xarray Dataset.
+
+        Args:
+            model: The QRNN or DRNN model to evaluate.
+            surface_types: The surface types for all samples in
+                this dataset. They are provided as external argument
+                because using the original data may not be possible if
+                the samples in the dataset have been shuffled.
+            batch_size: The batch size to use for the evaluation.
+            device: On which device to run the evaluation.
+
+        Return:
+            ``xarray.Dataset`` containing the predicted and reference values
+            for the data in this dataset.
         """
         n_samples = self.x.shape[0]
         y_means = []
         y_medians = []
+        y_samples = []
         dy_means = []
         dy_medians = []
         pops = []
@@ -694,6 +718,7 @@ class GPROFConvDataset:
                 if log:
                     y_pred = torch.exp(np.log(10) * y_pred)
                 y_mean = model.posterior_mean(y_pred=y_pred)
+                y_sample = model.sample_posterior(y_pred=y_pred).squeeze(1)
                 dy_mean = y_mean - y
                 y_median = model.posterior_quantiles(
                     y_pred=y_pred, quantiles=[0.5]
@@ -701,6 +726,7 @@ class GPROFConvDataset:
                 dy_median = y_median - y
 
                 y_mean = y_mean.cpu().numpy()
+                y_sample = y_sample.cpu().numpy()
                 dy_mean = dy_mean.cpu().numpy()
                 y_median = y_median.cpu().numpy()
                 dy_median = dy_median.cpu().numpy()
@@ -710,6 +736,7 @@ class GPROFConvDataset:
                 indices = y_true[:, :, :] >= 0.0
                 y_means.append(y_mean[indices])
                 y_medians.append(y_median[indices])
+                y_samples.append(y_sample[indices])
                 dy_means.append(dy_mean[indices])
                 dy_medians.append(dy_median[indices])
                 y_trues.append(y_true[indices])
@@ -717,6 +744,7 @@ class GPROFConvDataset:
                 surfaces.append(sts[indices])
 
         y_means = np.concatenate(y_means, 0)
+        y_samples = np.concatenate(y_samples, 0)
         y_medians = np.concatenate(y_medians, 0)
         dy_means = np.concatenate(dy_means, 0)
         dy_medians = np.concatenate(dy_medians, 0)
@@ -728,6 +756,7 @@ class GPROFConvDataset:
 
         data = {
             "y_mean": (dims, y_means),
+            "y_samples": (dims, y_samples),
             "y_median": (dims, y_medians),
             "dy_mean": (dims, dy_means),
             "dy_median": (dims, dy_medians),
@@ -736,3 +765,56 @@ class GPROFConvDataset:
             "pop": (dims, pop),
         }
         return xr.Dataset(data)
+
+class GPROFConvValidationDataset(GPROFConvDataset):
+    """
+    Specialization of the GPROF convolutional dataset to be used for
+    validation. This class will neither shuffle the data nor replace
+    zero values by zero.
+    """
+    def __init__(
+            self,
+            filename,
+            target="surface_precip",
+            normalize=True,
+            batch_size=None,
+            normalizer=None,
+    ):
+        super().__init__(filename,
+                         target=target,
+                         normalize=normalize,
+                         transform_zero_rain=False,
+                         batch_size=batch_size,
+                         normalizer=normalizer,
+                         shuffle=False,
+                         bins=None)
+
+    def evaluate(
+        self,
+        model,
+        batch_size=16384,
+        device=torch.device("cuda"),
+        log=False,
+    ):
+        """
+        Run retrieval on test dataset and returns results as
+        xarray Dataset.
+
+        Args:
+            model: The QRNN or DRNN model to evaluate.
+            batch_size: The batch size to use for the evaluation.
+            device: On which device to run the evaluation.
+
+        Return:
+            ``xarray.Dataset`` containing the predicted and reference values
+            for the data in this dataset.
+        """
+        surface_types = self.get_surface_types()
+        return GPROFConvDataset.evaluate(
+            self,
+            model,
+            surface_types,
+            batch_size=batch_size,
+            device=device,
+            log=log
+        )
