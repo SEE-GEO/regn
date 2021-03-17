@@ -665,7 +665,7 @@ class GPROFConvDataset:
         self,
         model,
         surface_types,
-        batch_size=16384,
+        batch_size=128,
         device=torch.device("cuda"),
         log=False,
     ):
@@ -792,7 +792,7 @@ class GPROFConvValidationDataset(GPROFConvDataset):
     def evaluate(
         self,
         model,
-        batch_size=16384,
+        batch_size=32,
         device=torch.device("cuda"),
         log=False,
     ):

@@ -113,7 +113,7 @@ def write_orbit_header(output,
     new_header["number_of_pixels"] = data.pixels.size
     new_header.tofile(output)
 
-def write_scan_header(output):
+def write_scan_header(output, template=None):
     """
     Write scan header for custom preprocessor file.
 
@@ -122,8 +122,11 @@ def write_scan_header(output):
         data: xarray Dataset containing the data to write to
              the file handle.
     """
-    new_header = np.recarray(1, dtype=SCAN_HEADER_TYPES)
-    new_header.tofile(output)
+    if template:
+        header = template.get_scan_header(0)
+    else:
+        header = np.recarray(1, dtype=SCAN_HEADER_TYPES)
+    header.tofile(output)
 
 def write_scan(output, data):
     n_pixels = data.pixels.size
@@ -158,7 +161,7 @@ class PreprocessorFile:
             write_orbit_header(output, data, template=template)
             for i in range(n_scans):
                 scan_data = data[{"scans": i}]
-                write_scan_header(output)
+                write_scan_header(output, template=template)
                 write_scan(output, scan_data)
 
 

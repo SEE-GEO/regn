@@ -32,6 +32,8 @@ validation_data = GPROFValidationDataset(validation_data,
 for m in models:
     print(f"Running evaluate for model {m}.")
     model = QRNN.load(m)
+    model.bin_axis = 1
+    model.quantile_axis = 1
     results = validation_data.evaluate(model, 16 * 512, torch.device("cpu"))
     results.attrs["model"] = Path(m).name
 
