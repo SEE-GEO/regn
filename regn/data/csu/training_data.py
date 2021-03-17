@@ -43,11 +43,15 @@ def write_preprocessor_file(input_file,
     """
     data = xr.open_dataset(input_file)
     new_names = {
-        "samples": "pixels",
         "brightness_temps": "brightness_temperatures"
     }
-    data = data[{"samples": slice(0, n_samples)}]
-    data = data.rename(new_names).expand_dims("scans")
+    data = data[{"samples": slice(0, n_samples)}].rename(new_names)
+    data = data.assign_coords(
+        scans=data.samples // 1024,
+        pixels=data.samples % 1024
+    )
+    data = data.set_index(scanpixels=["scans", "pixels"])
+    data = data.unstack("scanpixels")
     shape = (data.scans.size, data.pixels.size, data.channel.size)
     eia = np.broadcast_to(data.attrs["nominal_eia"].reshape(1, 1, -1), shape)
     data["earth_incidence_angle"] = (("scans", "pixels", "channel"), eia)
