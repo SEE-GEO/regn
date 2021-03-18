@@ -45,17 +45,44 @@ def write_preprocessor_file(input_file,
     new_names = {
         "brightness_temps": "brightness_temperatures"
     }
-    data = data[{"samples": slice(0, n_samples)}].rename(new_names)
-    data = data.assign_coords(
-        scans=data.samples // 1024,
-        pixels=data.samples % 1024
+    n_pixels = 2048
+    if n_samples < data.samples.size:
+        indices = np.random.permutation(data.samples.size)[:n_samples]
+    else:
+        indices = slice(0, None)
+    print(indices)
+    data = data[{"samples": indices}].rename(new_names)
+    n_scans = data.samples.size // n_pixels
+    n_scans += (data.samples.size % n_pixels) > 0
+    print(data.samples.size, n_scans, n_pixels)
+
+    new_dims = ["scans", "pixels", "channels"]
+    new_dataset = {
+        "scans": np.arange(n_scans),
+        "pixels": np.arange(n_pixels),
+        "channels": np.arange(15),
+    }
+    dims = ("scans", "pixels", "channels")
+    shape = ((n_scans, n_pixels, 15))
+    for k in data:
+        da = data[k]
+        n_dims = len(da.dims)
+        s = shape[:n_dims + 1]
+        new_data = np.zeros(s)
+        n = da.data.size
+        print(n)
+        new_data.ravel()[:n] = da.data.ravel()
+        new_data.ravel()[n:] = np.nan
+        new_dataset[k] = ((dims[:n_dims + 1]), new_data)
+
+    new_dataset["earth_incidence_angle"] = (
+        dims,
+        np.broadcast_to(data.attrs["nominal_eia"].reshape(1, 1, -1),
+                        (n_scans, n_pixels, 15))
     )
-    data = data.set_index(scanpixels=["scans", "pixels"])
-    data = data.unstack("scanpixels")
-    shape = (data.scans.size, data.pixels.size, data.channel.size)
-    eia = np.broadcast_to(data.attrs["nominal_eia"].reshape(1, 1, -1), shape)
-    data["earth_incidence_angle"] = (("scans", "pixels", "channel"), eia)
-    PreprocessorFile.write(output_file, data, template=template)
+
+    new_data = xr.Dataset(new_dataset)
+    PreprocessorFile.write(output_file, new_data, template=template)
 
 
 ###############################################################################
