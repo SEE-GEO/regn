@@ -47,6 +47,32 @@ def test_gprof_dataset():
     assert np.all(np.isclose(x_mean, x_mean_ref, atol=1e-6))
     assert np.all(np.isclose(y_mean, y_mean_ref, atol=1e-6))
 
+def test_save_data(tmp_path):
+    """
+    Ensure that storing data and loading it again yields the
+    same training data.
+    """
+    path = Path(__file__).parent
+    input_file = path / "data" / "dataset_simple.nc"
+    dataset = GPROFDataset(input_file,
+                           batch_size=2,
+                           shuffle=False)
+
+    normalizer = dataset.normalizer
+    output_path = tmp_path / "test.nc"
+    dataset.save_data(output_path)
+
+    dataset2 = GPROFDataset(output_path,
+                            normalizer=normalizer,
+                            shuffle=False,
+                            batch_size=2)
+
+    print(dataset.x)
+    print(dataset2.x)
+
+    assert np.all(np.isclose(dataset.x, dataset2.x))
+    assert np.all(np.isclose(dataset.x, dataset2.x))
+
 
 def test_evaluate_simple():
     """

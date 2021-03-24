@@ -27,6 +27,7 @@ LOGGER = logging.getLogger(__name__)
 
 def write_preprocessor_file(input_file,
                             output_file,
+                            x=None,
                             n_samples=None,
                             template=None):
     """
@@ -141,6 +142,7 @@ class GPROFDataset:
         else:
             self.normalizer = normalizer
 
+        self.normalize = normalize
         if normalize:
             self.x = self.normalizer(self.x)
 
@@ -221,6 +223,43 @@ class GPROFDataset:
             #
 
             self.y = variables[self.target][:]
+
+    def save_data(self, filename):
+        if self.normalize:
+            x = self.normalizer.invert(self.x)
+        else:
+            x = self.x
+
+        if self.binned:
+            centers = 0.5 * (self.bins[1:] + self.bins[:-1])
+            y = centers[self.y]
+        else:
+            y = self.y
+
+        bts = x[:, :15]
+        t2m = x[:, 15]
+        tcwv = x[:, 16]
+        st = np.where(x[:, 17:17+19])[1]
+        print(st.size)
+        at = np.where(x[:, 17+19:17+23])[1]
+
+        dataset = xr.open_dataset(self.filename)
+
+        dims = ("samples", "channel")
+        new_dataset = {
+            "brightness_temps": (dims, bts),
+            "two_meter_temperature": (dims[:1], t2m),
+            "total_column_water_vapor": (dims[:1], tcwv),
+            "surface_type": (dims[:1], st),
+            "airmass_type": (dims[:1], at),
+            "surface_precip": (dims[:1], y)
+        }
+        new_dataset = xr.Dataset(new_dataset)
+        new_dataset.attrs = dataset.attrs
+
+        new_dataset.to_netcdf(filename)
+
+
 
     def _shuffle(self):
         if not self._shuffled:
@@ -363,6 +402,7 @@ class GPROFDataset:
         grads = []
         surfaces = []
         airmasses = []
+        dydxs = []
 
         st_indices = torch.arange(19).reshape(1, -1).to(device)
         am_indices = torch.arange(4).reshape(1, -1).to(device)
@@ -382,6 +422,10 @@ class GPROFDataset:
             model.model.zero_grad()
 
             x = torch.tensor(self.x[i_start:i_end]).float().to(device)
+            x_l = x.clone()
+            x_l[:, 0] -= 0.01
+            x_r = x.clone()
+            x_r[:, 0] += 0.01
             y = torch.tensor(self.y[i_start:i_end]).float().to(device)
 
             x.requires_grad = True
@@ -390,6 +434,9 @@ class GPROFDataset:
 
             y_pred = model.predict(x)
             y_mean = model.posterior_mean(y_pred=y_pred).reshape(-1)
+            y_mean_l = model.posterior_mean(x_l).reshape(-1)
+            y_mean_r = model.posterior_mean(x_r).reshape(-1)
+            dydx = (y_mean_r - y_mean_l) / 0.02
             torch.sum(y_mean).backward()
 
             y_means.append(y_mean.detach().cpu())
@@ -397,12 +444,14 @@ class GPROFDataset:
             grads.append(x.grad[:, :15].cpu())
             surfaces += [(x[:, 17:36] * st_indices).sum(1).cpu()]
             airmasses += [(x[:, 36:] * am_indices).sum(1).cpu()]
+            dydxs += [dydx.cpu()]
 
         y_means = torch.cat(y_means, 0).detach().numpy()
         y_trues = torch.cat(y_trues, 0).detach().numpy()
         grads = torch.cat(grads, 0).detach().numpy()
         surfaces = torch.cat(surfaces, 0).detach().numpy()
         airmasses = torch.cat(airmasses, 0).detach().numpy()
+        dydxs = torch.cat(dydxs, 0).detach().numpy()
 
         dims = ["samples"]
 
@@ -411,7 +460,8 @@ class GPROFDataset:
             "surface_type": (dims, surfaces),
             "airmass_type": (dims, airmasses),
             "y_mean": (dims, y_means),
-            "y_true": (dims, y_trues)
+            "y_true": (dims, y_trues),
+            "dydxs": (dims, dydxs)
         }
         return xr.Dataset(data)
 
