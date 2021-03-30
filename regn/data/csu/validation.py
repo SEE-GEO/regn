@@ -307,7 +307,7 @@ def find_closest_mrms_pixel(lat, lon, mrms_data):
     column_index = idx[0] % NX
     return row_index, column_index
 
-def _run_preprocessor(l1c_file,
+def run_preprocessor(l1c_file,
                       output_file):
     """
     Run preprocessor on L1C GMI file.
@@ -341,9 +341,9 @@ class FileProcessor:
                  validation_data_path,
                  l1c_data_path,
                  output_path):
-        self.validation_data_path = validation_data_path
-        self.l1c_data_path = l1c_data_path
-        self.output_path = output_path
+        self.validation_data_path = Path(validation_data_path)
+        self.l1c_data_path = Path(l1c_data_path)
+        self.output_path = Path(output_path)
         self.granules = list_overpasses(validation_data_path)
 
     def match_granule(self,
@@ -558,9 +558,10 @@ class FileProcessor:
         date = self.granules[granule_number]
         preprocessor_output_path = (self.output_path / "preprocessor"
                                     / f"{date.year}" / f"date.month")
+        preprocessor_output_path.mkdir(parents=True, exist_ok=True)
         matchup_output_path = (self.output_path / "match_ups"
                                / f"{date.year}" / f"date.month")
-
+        matchup_output_path.mkdir(parents=True, exist_ok=True)
 
         roi = [-130, 20, 60.0, 55]
         _, l1c_file_sub = tempfile.mkstemp()
@@ -574,7 +575,6 @@ class FileProcessor:
             # Run preprocessor
             preprocessor_output = (preprocessor_output_path /
                                    (Path(l1c_file.filename).stem + ".pp"))
-            preproc
             run_preprocessor(l1c_file_sub, preprocessor_output)
 
             # Process granule

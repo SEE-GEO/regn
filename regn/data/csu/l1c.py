@@ -40,6 +40,7 @@ class L1CFile:
 
 
     def __init__(self, path):
+        self.filename = path
         self.path = Path(path)
 
     def __repr__(self):
@@ -252,17 +253,3 @@ class L1CFile:
             }
 
         return xr.Dataset(data)
-
-
-
-
-
-
-
-
-l1c = L1CFile.open_granule(16566, "/home/simonpf/src/regn/data/validation")
-
-file = h5py.File(l1c.path, "r")
-roi = [-130, 20, 60.0, 55]
-l1c.extract_scans(roi, "test.hdf5")
-l1c.open()
