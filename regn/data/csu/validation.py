@@ -297,8 +297,6 @@ def find_closest_mrms_pixel(lat, lon, mrms_data):
     xyz = np.stack(_WGS84_TO_ECEF.transform(lat, lon, 0), axis=-1)
     dist, idx = _KD_TREE.query(xyz.reshape(1, -1))
 
-    print(mrms_data["latitude"])
-    print(mrms_data["longitude"])
     if dist > 5e3:
         return None
 
@@ -388,7 +386,6 @@ class FileProcessor:
             for j in range(n_pixels):
                 lon = lons[i, j]
                 lat = lats[i, j]
-                print(lon, lat)
                 coords = find_closest_mrms_pixel(lat, lon, mrms_data)
                 if coords is None:
                     precip_rate[i, j] = np.nan
@@ -419,39 +416,38 @@ class FileProcessor:
                 }]
 
                 if mrms_sub.time.size > 2:
-                    mrms_sub = mrms_sub.interp({"time": time})[0]
-                else:
-                    mrms_sub = mrms_sub[{"time": 0}]
+                    mrms_sub = mrms_sub.interp({"time": time})
 
                 precip_rate[i, j] = np.sum(
-                    weights * mrms_sub["precip_rate"].data
+                    weights * mrms_sub["precip_rate"].data[0]
                 )
                 radar_quality_index[i, j] = np.sum(
-                    weights * mrms_sub["radar_quality_index"].data
+                    weights * mrms_sub["radar_quality_index"].data[0]
                 )
 
-                rain_mask = (mrms_sub["mask"] > 0).data.astype(np.float32)
+                mask = mrms_sub["mask"].data[0]
+                rain_mask = (mask > 0).astype(np.float32)
                 rain_fraction[i, j] = np.sum(weights * rain_mask)
 
-                warm_strat_mask = mrms_sub["mask"].isin([1, 2]).data.astype(np.float32)
+                warm_strat_mask = mask.isin([1, 2]).astype(np.float32)
                 warm_strat_fraction[i, j] = np.sum(weights * warm_strat_mask)
 
-                cold_strat_mask = mrms_sub["mask"].isin([10]).data.astype(np.float32)
+                cold_strat_mask = mask.isin([10]).astype(np.float32)
                 cold_strat_fraction[i, j] = np.sum(weights * cold_strat_mask)
 
-                snow_mask = mrms_sub["mask"].isin([3, 4]).data.astype(np.float32)
+                snow_mask = mask.isin([3, 4]).astype(np.float32)
                 snow_fraction[i, j] = np.sum(weights * snow_mask)
 
-                conv_mask = mrms_sub["mask"].isin([6.0]).data.astype(np.float32)
+                conv_mask = mask.isin([6.0]).astype(np.float32)
                 conv_fraction[i, j] = np.sum(weights * conv_mask)
 
-                hail_mask = mrms_sub["mask"].isin([7.0]).data.astype(np.float32)
+                hail_mask = mask.isin([7.0]).astype(np.float32)
                 hail_fraction[i, j] = np.sum(weights * hail_mask)
 
-                trop_strat_mask = mrms_sub["mask"].isin([91.0]).data.astype(np.float32)
+                trop_strat_mask = mask.isin([91.0]).astype(np.float32)
                 tropical_strat_fraction[i, j] = np.sum(weights * trop_strat_mask)
 
-                trop_conv_mask = mrms_sub["mask"].isin([96.0]).data.astype(np.float32)
+                trop_conv_mask = mask.isin([96.0]).astype(np.float32)
                 tropical_conv_fraction[i, j] = np.sum(weights * trop_conv_mask)
 
         match_data = {}
@@ -579,7 +575,7 @@ class FileProcessor:
 
             # Process granule
             matchup_output = (matchup_output_path /
-                              Path(l1c_file.filename).stem + ".nc")
+                              (str(Path(l1c_file.filename).stem) + ".nc"))
             l1c_data = L1CFile(l1c_file_sub).open()
             match_up = self.match_granule(granule_number, l1c_data)
             match_up.to_netcdf(matchup_output)
