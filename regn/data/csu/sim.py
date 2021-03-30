@@ -268,7 +268,7 @@ def _write_results(output_file, data):
 
 def _find_l1c_file(path, sim_file):
     """
-    Find GPROG GMI L1C file corresponding to .sim file.
+    Find GPROF GMI L1C file corresponding to .sim file.
 
     Args:
         path: Path pointing to the root of the folder tree containing the
