@@ -95,6 +95,9 @@ class L1CFile:
                                          shape=(n_scans, ) + shape[1:],
                                          data=item[indices])
 
+                for a in input["S1"].attrs:
+                    g.attrs[a] = input["S1"].attrs[a]
+
                 g_st = g.create_group("ScanTime")
                 for name, item in input["S1/ScanTime"].items():
                     if isinstance(item, h5py.Dataset):
@@ -118,6 +121,8 @@ class L1CFile:
                         g.create_dataset(name,
                                          shape=(n_scans, ) + shape[1:],
                                          data=item[indices])
+                for a in input["S2"].attrs:
+                    g.attrs[a] = input["S2"].attrs[a]
 
                 g_st = g.create_group("ScanTime")
                 for name, item in input["S2/ScanTime"].items():
