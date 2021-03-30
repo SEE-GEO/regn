@@ -112,6 +112,3 @@ class UNet(nn.Module):
         u_out = self.up_block_4(u_128, d_64)
 
         return self.out_block(u_out)
-
-x = torch.rand(1, 16, 128, 128)
-net = UNet(16, 1)

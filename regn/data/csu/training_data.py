@@ -3,26 +3,97 @@
 regn.data.csu.training_data
 ===========================
 
-This module provides an interface to the GPROF training data.
+This module provides interface class to load the training and evaluation
+ data for the NN-based GPROF algorithms.
 """
 import logging
-LOGGER = logging.getLogger(__name__)
 
 from netCDF4 import Dataset
 import numpy as np
 import torch
+from tqdm import tqdm
+import xarray as xr
+
 from quantnn.normalizer import MinMaxNormalizer, Normalizer
 from quantnn.drnn import _to_categorical
 import quantnn.quantiles as qq
 import quantnn.density as qd
-from tqdm import tqdm
-import xarray
 
 from regn.data.augmentation import extract_subscene, mask_stripe
+from regn.data.csu.preprocessor import PreprocessorFile
 
+LOGGER = logging.getLogger(__name__)
+
+
+def write_preprocessor_file(input_file,
+                            output_file,
+                            x=None,
+                            n_samples=None,
+                            template=None):
+    """
+    Extract sample from training data file and write to preprocessor format.
+
+    Args:
+        input_file: Path to the NetCDF4 file containing the training or test
+            data.
+        output_file: Path of the file to write the output to.
+        n_samples: How many samples to extract from the training data file.
+        template: Template preprocessor file use to determine the orbit header
+             information. If not provided this data will be filled with dummy
+             values.
+    """
+    data = xr.open_dataset(input_file)
+    new_names = {
+        "brightness_temps": "brightness_temperatures"
+    }
+    n_pixels = 2048
+    if n_samples < data.samples.size:
+        indices = np.random.permutation(data.samples.size)[:n_samples]
+    else:
+        indices = slice(0, None)
+    print(indices)
+    data = data[{"samples": indices}].rename(new_names)
+    n_scans = data.samples.size // n_pixels
+    n_scans += (data.samples.size % n_pixels) > 0
+    print(data.samples.size, n_scans, n_pixels)
+
+    new_dims = ["scans", "pixels", "channels"]
+    new_dataset = {
+        "scans": np.arange(n_scans),
+        "pixels": np.arange(n_pixels),
+        "channels": np.arange(15),
+    }
+    dims = ("scans", "pixels", "channels")
+    shape = ((n_scans, n_pixels, 15))
+    for k in data:
+        da = data[k]
+        n_dims = len(da.dims)
+        s = shape[:n_dims + 1]
+        new_data = np.zeros(s)
+        n = da.data.size
+        print(n)
+        new_data.ravel()[:n] = da.data.ravel()
+        new_data.ravel()[n:] = np.nan
+        new_dataset[k] = ((dims[:n_dims + 1]), new_data)
+
+    new_dataset["earth_incidence_angle"] = (
+        dims,
+        np.broadcast_to(data.attrs["nominal_eia"].reshape(1, 1, -1),
+                        (n_scans, n_pixels, 15))
+    )
+
+    new_data = xr.Dataset(new_dataset)
+    PreprocessorFile.write(output_file, new_data, template=template)
+
+
+###############################################################################
+# Single-pixel observations.
+###############################################################################
 class GPROFDataset:
     """
-    Dataset interface to load GPROF data from NetCDF file.
+    Dataset class providing an interface for the single-pixel GPROF
+    training dataset mapping TBs and ancillary data to surface precip
+    values.
 
     Attributes:
         x: Rank-2 tensor containing the input data with
@@ -34,15 +105,18 @@ class GPROFDataset:
         normalizer: The normalizer used to normalize the data.
         shuffle: Whether or not the ordering of the data is shuffled.
     """
-    def __init__(self,
-                 filename,
-                 target="surface_precip",
-                 normalize=True,
-                 transform_zero_rain=True,
-                 batch_size=None,
-                 normalizer=None,
-                 shuffle=True,
-                 bins=None):
+
+    def __init__(
+        self,
+        filename,
+        target="surface_precip",
+        normalize=True,
+        transform_zero_rain=True,
+        batch_size=None,
+        normalizer=None,
+        shuffle=True,
+        bins=None,
+    ):
         """
         Create GPROF dataset.
 
@@ -62,14 +136,13 @@ class GPROFDataset:
 
         indices_1h = list(range(17, 40))
         if normalizer is None:
-            self.normalizer = Normalizer(self.x,
-                                         exclude_indices=indices_1h)
+            self.normalizer = Normalizer(self.x, exclude_indices=indices_1h)
         elif isinstance(normalizer, type):
-            self.normalizer = normalizer(self.x,
-                                         exclude_indices=indices_1h)
+            self.normalizer = normalizer(self.x, exclude_indices=indices_1h)
         else:
             self.normalizer = normalizer
 
+        self.normalize = normalize
         if normalize:
             self.x = self.normalizer(self.x)
 
@@ -89,7 +162,6 @@ class GPROFDataset:
         if self.shuffle:
             self._shuffle()
 
-
     def _transform_zero_rain(self):
         """
         Transforms rain amounts smaller than 1e-4 to a random amount withing
@@ -104,8 +176,7 @@ class GPROFDataset:
         """
         with Dataset(self.filename, "r") as dataset:
 
-            LOGGER.info("Loading data from file: %s",
-                        self.filename)
+            LOGGER.info("Loading data from file: %s", self.filename)
 
             variables = dataset.variables
             n = dataset.dimensions["samples"].size
@@ -122,7 +193,7 @@ class GPROFDataset:
             v = dataset["brightness_temps"]
             while index_start < n:
                 index_end = index_start + chunk_size
-                bts[index_start: index_end, :] = v[index_start: index_end, :].data
+                bts[index_start:index_end, :] = v[index_start:index_end, :].data
                 index_start += chunk_size
 
             invalid = (bts > 500.0) + (bts < 0.0)
@@ -153,13 +224,49 @@ class GPROFDataset:
 
             self.y = variables[self.target][:]
 
+    def save_data(self, filename):
+        if self.normalize:
+            x = self.normalizer.invert(self.x)
+        else:
+            x = self.x
+
+        if self.binned:
+            centers = 0.5 * (self.bins[1:] + self.bins[:-1])
+            y = centers[self.y]
+        else:
+            y = self.y
+
+        bts = x[:, :15]
+        t2m = x[:, 15]
+        tcwv = x[:, 16]
+        st = np.where(x[:, 17:17+19])[1]
+        print(st.size)
+        at = np.where(x[:, 17+19:17+23])[1]
+
+        dataset = xr.open_dataset(self.filename)
+
+        dims = ("samples", "channel")
+        new_dataset = {
+            "brightness_temps": (dims, bts),
+            "two_meter_temperature": (dims[:1], t2m),
+            "total_column_water_vapor": (dims[:1], tcwv),
+            "surface_type": (dims[:1], st),
+            "airmass_type": (dims[:1], at),
+            "surface_precip": (dims[:1], y)
+        }
+        new_dataset = xr.Dataset(new_dataset)
+        new_dataset.attrs = dataset.attrs
+
+        new_dataset.to_netcdf(filename)
+
+
+
     def _shuffle(self):
         if not self._shuffled:
             indices = np.random.permutation(self.x.shape[0])
             self.x = self.x[indices, :]
             self.y = self.y[indices]
             self._shuffled = True
-
 
     def __getitem__(self, i):
         """
@@ -169,25 +276,25 @@ class GPROFDataset:
         Args:
             i(int): The index of the sample to return
         """
+        if i >= len(self):
+            raise IndexError()
 
         self._shuffled = False
         if self.batch_size is None:
-            return (torch.tensor(self.x[[i], :]),
-                    torch.tensor(self.y[[i]]))
+            return (torch.tensor(self.x[[i], :]), torch.tensor(self.y[[i]]))
 
         i_start = self.batch_size * i
         i_end = self.batch_size * (i + 1)
 
+        x = torch.tensor(self.x[i_start:i_end, :])
+        y = torch.tensor(self.y[i_start:i_end])
+
         if i + 1 == len(self):
-            print("shufflin' ...")
             self._shuffle()
             if not self.binned:
                 self._transform_zero_rain()
 
-        if i >= len(self):
-            raise IndexError()
-        return (torch.tensor(self.x[i_start:i_end, :]),
-                torch.tensor(self.y[i_start:i_end]))
+        return x, y
 
     def __len__(self):
         """
@@ -199,12 +306,19 @@ class GPROFDataset:
         else:
             return self.x.shape[0]
 
-    def evaluate(self,
-                 model,
-                 batch_size=16384,
-                 device=torch.device("cuda")):
+    def evaluate(self, model, batch_size=16384, device=torch.device("cuda")):
         """
-        Run retrieval on dataset.
+        Run retrieval on test dataset and returns results as
+        xarray Dataset.
+
+        Args:
+            model: The QRNN or DRNN model to evaluate.
+            batch_size: The batch size to use for the evaluation.
+            device: On which device to run the evaluation.
+
+        Return:
+            ``xarray.Dataset`` containing the predicted and reference values
+            for the data in this dataset.
         """
         n_samples = self.x.shape[0]
         y_means = []
@@ -215,6 +329,7 @@ class GPROFDataset:
         y_trues = []
         surfaces = []
         airmasses = []
+        y_samples = []
 
         st_indices = torch.arange(19).reshape(1, -1).to(device)
         am_indices = torch.arange(4).reshape(1, -1).to(device)
@@ -235,10 +350,13 @@ class GPROFDataset:
                 y_pred = model.predict(x)
                 y_mean = model.posterior_mean(y_pred=y_pred).reshape(-1)
                 dy_mean = y_mean - y
-                y_median = model.posterior_quantiles(y_pred=y_pred, quantiles=[0.5]).squeeze(1)
+                y_median = model.posterior_quantiles(
+                    y_pred=y_pred, quantiles=[0.5]
+                ).squeeze(1)
+                y_sample = model.sample_posterior(y_pred=y_pred).squeeze(1)
                 dy_median = y_median - y
 
-
+                y_samples.append(y_sample.cpu())
                 y_means.append(y_mean.cpu())
                 dy_means.append(dy_mean.cpu())
                 y_medians.append(y_median.cpu())
@@ -252,6 +370,7 @@ class GPROFDataset:
 
         y_means = torch.cat(y_means, 0).detach().numpy()
         y_medians = torch.cat(y_medians, 0).detach().numpy()
+        y_samples = torch.cat(y_samples, 0).detach().numpy()
         dy_means = torch.cat(dy_means, 0).detach().numpy()
         dy_medians = torch.cat(dy_medians, 0).detach().numpy()
         pops = torch.cat(pops, 0).detach().numpy()
@@ -263,249 +382,129 @@ class GPROFDataset:
 
         data = {
             "y_mean": (dims, y_means),
+            "y_sampled": (dims, y_samples),
             "y_median": (dims, y_medians),
             "dy_mean": (dims, dy_means),
-            "dy_median": (dims, dy_medians),
-            "y": (dims, y_trues),
+            "dy_median": (dims, dy_medians), "y": (dims, y_trues),
             "pop": (dims, pops),
             "surface_type": (dims, surfaces),
-            "airmass_type": (dims, airmasses)
-            }
-        return xarray.Dataset(data)
-
-
-def evaluate(data,
-             model,
-             device=torch.device("cuda")):
-
-    if not torch.cuda.is_available():
-        device = torch.device("cpu")
-
-    cpu = torch.device("cpu")
-
-    quantiles = torch.tensor(model.quantiles).float().to(device)
-    n_quantiles = len(quantiles)
-
-    means = []
-    dy_means = []
-    medians = []
-    dy_medians = []
-    ys = []
-    surfaces = []
-    airmasses = []
-    calibration = torch.zeros_like(quantiles)
-    n_samples = 0
-
-    model.model.eval()
-    model.model.to(device)
-
-    st_indices = torch.arange(19).reshape(1, -1).to(device)
-    am_indices = torch.arange(4).reshape(1, -1).to(device)
-
-    with torch.no_grad():
-        for x, y in data:
-
-            x = x.float().to(device)
-            y = torch.unsqueeze(y.float().to(device), 1)
-
-            y_pred = model.model(x)
-
-            mean = qq.posterior_mean(y_pred, quantiles, quantile_axis=1)
-            dy_mean = mean - y
-            median = qq.posterior_quantiles(y_pred,
-                                            quantiles,
-                                            [0.5], quantile_axis=1)
-            dy_median = median - y
-
-            means += [mean.to(cpu).squeeze(1)]
-            dy_means += [dy_mean.to(cpu).squeeze(1)]
-            dy_medians += [dy_mean.to(cpu).squeeze(1)]
-            ys += [y.to(cpu).squeeze(1)]
-
-            #shape[1] = -1
-            calibration += (y < y_pred).sum((0, 2, 3))
-
-            n_samples += x.shape[0]
-
-            if x.shape[1] > 15:
-                surfaces += [(x[:, 17:36] * st_indices).sum(1).cpu()]
-                airmasses += [(x[:, 36:] * am_indices).sum(1).cpu()]
-
-        means = torch.cat(means, 0)
-        dy_means = torch.cat(dy_means, 0)
-        medians = torch.cat(dy_medians, 0)
-        dy_medians = torch.cat(dy_medians, 0)
-        ys = torch.cat(ys, 0)
-        if x.shape[1] > 15:
-            surfaces = torch.cat(surfaces, 0)
-            airmasses = torch.cat(airmasses, 0)
-
-
-    dims = ["samples", "scans", "pixels"]
-
-    data = {
-        "y_mean": (dims, means.numpy()),
-        "y_median": (dims, medians.numpy()),
-        "dy_mean": (dims, dy_means.numpy()),
-        "dy_median": (dims, dy_medians.numpy()),
-        "y": (dims, ys.numpy()),
-        "quantiles": (("quantiles",), quantiles.cpu().numpy()),
-        "calibration": (("quantiles",), calibration.cpu().numpy() / n_samples),
+            "airmass_type": (dims, airmasses),
         }
-    if x.shape[1] > 15:
-        data["surface_type"] = (("samples",), surfaces.numpy())
-        data["airmass_type"] = (("samples",), surfaces.numpy())
+        return xr.Dataset(data)
 
+    def evaluate_sensitivity(self, model, batch_size=512, device=torch.device("cuda")):
+        """
+        Run retrieval on dataset.
+        """
+        n_samples = self.x.shape[0]
+        y_means = []
+        y_trues = []
+        grads = []
+        surfaces = []
+        airmasses = []
+        dydxs = []
 
-    del means
-    del dy_mean
-    del medians
-    del dy_median
-    del ys
-    del y_pred
+        st_indices = torch.arange(19).reshape(1, -1).to(device)
+        am_indices = torch.arange(4).reshape(1, -1).to(device)
+        i_start = 0
+        model.model.to(device)
 
-    return xarray.Dataset(data)
+        loss = torch.nn.MSELoss()
 
-def evaluate_drnn(data,
-                  model,
-                  device=torch.device("cuda")):
+        model.model.eval()
 
-    if not torch.cuda.is_available():
-        device = torch.device("cpu")
+        for i in tqdm(range(n_samples // batch_size + 1)):
+            i_start = i * batch_size
+            i_end = i_start + batch_size
+            if i_start >= n_samples:
+                break
 
-    cpu = torch.device("cpu")
+            model.model.zero_grad()
 
-    bins = torch.tensor(model.bins).float().to(device)
+            x = torch.tensor(self.x[i_start:i_end]).float().to(device)
+            x_l = x.clone()
+            x_l[:, 0] -= 0.01
+            x_r = x.clone()
+            x_r[:, 0] += 0.01
+            y = torch.tensor(self.y[i_start:i_end]).float().to(device)
 
-    means = []
-    dy_means = []
-    medians = []
-    dy_medians = []
-    ys = []
-    n_samples = 0
-    tercile_1 = []
-    tercile_2 = []
-    surfaces = []
-    airmasses = []
+            x.requires_grad = True
+            y.requires_grad = True
+            i_start += batch_size
 
-    model.model.eval()
-    model.model.to(device)
+            y_pred = model.predict(x)
+            y_mean = model.posterior_mean(y_pred=y_pred).reshape(-1)
+            y_mean_l = model.posterior_mean(x_l).reshape(-1)
+            y_mean_r = model.posterior_mean(x_r).reshape(-1)
+            dydx = (y_mean_r - y_mean_l) / 0.02
+            torch.sum(y_mean).backward()
 
-    st_indices = torch.arange(19).reshape(1, -1).to(device)
-    am_indices = torch.arange(4).reshape(1, -1).to(device)
-
-    with torch.no_grad():
-        for x, y in data:
-
-            x = x.float().to(device)
-            y = y.float().to(device).reshape(-1)
-
-
-            y_pred = torch.softmax(model.model(x), 1)
-            y_pred = qd.normalize(y_pred, bins)
-
-
-            mean = qd.posterior_mean(y_pred, bins, bin_axis=1).reshape(-1)
-            dy_mean = mean - y
-            median = qd.posterior_quantiles(y_pred,
-                                            bins,
-                                            [0.5], bin_axis=1).reshape(-1)
-            t1 = qd.posterior_quantiles(y_pred,
-                                        bins,
-                                        [0.01], bin_axis=1).reshape(-1)
-            t2 = qd.posterior_quantiles(y_pred,
-                                        bins,
-                                        [0.99], bin_axis=1).reshape(-1)
-            dy_median = mean - y
-
-            means += [mean.to(cpu)]
-            medians += [median.to(cpu)]
-            dy_means += [dy_mean.to(cpu)]
-            dy_medians += [dy_median.to(cpu)]
-            ys += [y.to(cpu)]
-            tercile_1 += [t1.to(cpu)]
-            tercile_2 += [t2.to(cpu)]
-
-            n_samples += x.shape[0]
-
+            y_means.append(y_mean.detach().cpu())
+            y_trues.append(y.detach().cpu())
+            grads.append(x.grad[:, :15].cpu())
             surfaces += [(x[:, 17:36] * st_indices).sum(1).cpu()]
             airmasses += [(x[:, 36:] * am_indices).sum(1).cpu()]
+            dydxs += [dydx.cpu()]
 
-        means = torch.cat(means, 0)
-        dy_means = torch.cat(dy_means, 0)
-        medians = torch.cat(medians, 0)
-        dy_medians = torch.cat(dy_medians, 0)
-        ys = torch.cat(ys, 0)
-        surfaces = torch.cat(surfaces, 0)
-        airmasses = torch.cat(airmasses, 0)
-        tercile_1 = torch.cat(tercile_1, 0)
-        tercile_2 = torch.cat(tercile_2, 0)
+        y_means = torch.cat(y_means, 0).detach().numpy()
+        y_trues = torch.cat(y_trues, 0).detach().numpy()
+        grads = torch.cat(grads, 0).detach().numpy()
+        surfaces = torch.cat(surfaces, 0).detach().numpy()
+        airmasses = torch.cat(airmasses, 0).detach().numpy()
+        dydxs = torch.cat(dydxs, 0).detach().numpy()
 
+        dims = ["samples"]
 
-    dims = ["samples"]
-
-    data = {
-        "y_mean": (("samples",), means.numpy()),
-        "y_median": (("samples",), medians.numpy()),
-        "dy_mean": (("samples",), dy_means.numpy()),
-        "dy_median": (("samples",), dy_medians.numpy()),
-        "y": (("samples",), ys.numpy()),
-        "surface_type": (("samples",), surfaces.numpy()),
-        "airmass_type": (("samples",), airmasses.numpy()),
-        "1st_tercile": (("samples",), tercile_1.numpy()),
-        "2nd_tercile": (("samples",), tercile_2.numpy())
+        data = {
+            "gradients": (dims + ["channels",], grads),
+            "surface_type": (dims, surfaces),
+            "airmass_type": (dims, airmasses),
+            "y_mean": (dims, y_means),
+            "y_true": (dims, y_trues),
+            "dydxs": (dims, dydxs)
         }
+        return xr.Dataset(data)
 
-    del means
-    del dy_mean
-    del medians
-    del dy_median
-    del ys
-    del y_pred
-
-    return xarray.Dataset(data)
-
-import math
-
-def _pixel_offset(pixel_index):
-    a = 30 / 110 ** 2
-    b = 110
-    offset = a * (pixel_index - b) ** 2
-    return offset
-
-
-def _extract_subscene(input_data, p_in, p_out):
+class GPROFValidationDataset(GPROFDataset):
     """
-    Data augmentation function that extracts 164 x 164 patches from larger
-    patch and transforms the data to simulate retrievals at different regions
-    of the swath.
+    Specialization of the GPROF single-pixel dataset to be used for
+    validation. This class will neither shuffle the data nor replace
+    zero values by zero and will add geolocation information to the
+    evaluation results.
+
+
+    Attributes:
+        lats: Vector containing the latitude of each sample in the
+             validation data set.
+        lons: Vector containing the longitude of each sample in the
+             validation data set.
     """
-    p_in = np.clip(p_in, -1.0, 1.0)
-    p_out = np.clip(p_out, -1.0, 1.0)
-    c_in = int(110  + 0.5 * (157 - 65) * p_in)
-    c_out = int(110  + 0.5 * (157 - 65) * p_out)
+    def __init__(
+        self,
+        filename,
+        target="surface_precip",
+        normalize=True,
+        batch_size=None,
+        normalizer=None,
+    ):
+        super().__init__(filename,
+                         target=target,
+                         normalize=normalize,
+                         transform_zero_rain=False,
+                         batch_size=batch_size,
+                         normalizer=normalizer,
+                         shuffle=False,
+                         bins=None)
 
-    offsets_in = _pixel_offset(np.arange(c_in - 64, c_in + 64))
-    offsets_out = _pixel_offset(np.arange(c_out - 64, c_out + 64))
-
-    out = np.zeros_like(input_data, shape=input_data.shape[:-2] + (128, 128))
-    scan_start = 57
-    for i in range(128):
-        o_in = offsets_in[i]
-        o_out = offsets_out[i]
-        d_o = o_out - o_in
-
-        i_start = math.floor(scan_start + d_o)
-        c = scan_start + d_o - i_start
-
-        out[..., :, i] = (1.0 - c) * input_data[..., i_start:i_start + 128, c_in - 64 + i]
-        out[..., :, i] += c * input_data[..., i_start + 1:i_start + 129, c_in - 64 + i]
-    return out
+###############################################################################
+# Convolutional dataset
+###############################################################################
 
 
 class GPROFConvDataset:
     """
-    Dataset interface to load GPROF  data from NetCDF file.
+    Dataset interface to load  GPROF training data for a convolutional
+    network.
 
     Attributes:
         x: Rank-4 tensor containing the input data with
@@ -517,17 +516,20 @@ class GPROFConvDataset:
         normalizer: The normalizer used to normalize the data.
         shuffle: Whether or not the ordering of the data is shuffled.
     """
-    def __init__(self,
-                 filename,
-                 target="surface_precip",
-                 normalize=True,
-                 transform_zero_rain=True,
-                 transform_log=False,
-                 batch_size=None,
-                 normalizer=None,
-                 shuffle=True,
-                 bins=None,
-                 augment=True):
+
+    def __init__(
+        self,
+        filename,
+        target="surface_precip",
+        normalize=True,
+        transform_zero_rain=True,
+        transform_log=False,
+        batch_size=None,
+        normalizer=None,
+        shuffle=True,
+        bins=None,
+        augment=True,
+    ):
         """
         Create GPROF dataset.
 
@@ -568,16 +570,13 @@ class GPROFConvDataset:
 
         if bins is not None:
             self.binned = True
-            invalid = self.y < 0.0
             self.y = _to_categorical(self.y, bins)
-            self.y[invalid] = -1.0
         else:
             self.binned = False
 
         self._shuffled = False
         if self.shuffle:
             self._shuffle()
-
 
     def _transform_zero_rain(self):
         """
@@ -588,10 +587,9 @@ class GPROFConvDataset:
         self.y[indices] = np.random.uniform(1e-6, 1.0e-4, indices.sum())
 
     def _transform_log(self):
-        indices = (self.y < 0.0)
+        indices = self.y < 0.0
         self.y = np.log10(self.y)
         self.y[indices] = -10
-
 
     def _load_data(self):
         """
@@ -600,8 +598,7 @@ class GPROFConvDataset:
 
         with Dataset(self.filename, "r") as dataset:
 
-            LOGGER.info("Loading data from file: %s",
-                        self.filename)
+            LOGGER.info("Loading data from file: %s", self.filename)
 
             variables = dataset.variables
             n = dataset.dimensions["samples"].size
@@ -623,9 +620,9 @@ class GPROFConvDataset:
             v_sp = dataset["surface_precip"]
             while index_start < n:
                 index_end = index_start + chunk_size
-                bts = v_bt[index_start: index_end].data
-                bt[index_start: index_end] = bts
-                sp[index_start: index_end] = v_sp[index_start: index_end].data
+                bts = v_bt[index_start:index_end].data
+                bt[index_start:index_end] = bts
+                sp[index_start:index_end] = v_sp[index_start:index_end].data
                 index_start += chunk_size
 
             bt[bt < 0.0] = np.nan
@@ -642,7 +639,9 @@ class GPROFConvDataset:
             for i in range(self.x.shape[0]):
 
                 if not self.augment:
-                    self.x[i] = np.transpose(extract_subscene(bt[i], 0.0, 0.0), [2, 0, 1])
+                    self.x[i] = np.transpose(
+                        extract_subscene(bt[i], 0.0, 0.0), [2, 0, 1]
+                    )
                     self.y[i] = extract_subscene(sp[i], 0.0, 0.0)
                     continue
 
@@ -650,19 +649,20 @@ class GPROFConvDataset:
                 p_out = np.random.uniform(-1, 1)
                 s_o = np.random.uniform(-1, 1)
 
-                self.x[i] = np.transpose(extract_subscene(bt[i], p_in, p_out, s_o), [2, 0, 1])
+                self.x[i] = np.transpose(
+                    extract_subscene(bt[i], p_in, p_out, s_o), [2, 0, 1]
+                )
                 self.y[i] = extract_subscene(sp[i], p_in, p_out, s_o)
-
 
                 r = np.random.rand()
                 if r < 0.2:
                     mask_stripe(self.x[i], p_out)
 
                 r = np.random.rand()
-                if (r > 0.5):
+                if r > 0.5:
                     self.x[i] = np.flip(self.x[i], axis=2)
                     self.y[i] = np.flip(self.y[i], axis=1)
-                if (r > 0.5):
+                if r > 0.5:
                     self.x[i] = np.flip(self.x[i], axis=1)
                     self.y[i] = np.flip(self.y[i], axis=0)
         self.y[np.isnan(self.y)] = -1.0
@@ -691,12 +691,11 @@ class GPROFConvDataset:
             v = dataset["surface_type"]
             while index_start < n:
                 index_end = index_start + chunk_size
-                st[index_start: index_end] = v[index_start: index_end, 110-64:110+64, 110-64:110+64].data
+                st[index_start:index_end] = v[
+                    index_start:index_end, 110 - 64 : 110 + 64, 110 - 64 : 110 + 64
+                ].data
                 index_start += chunk_size
             return st
-
-                self.y[np.isnan(self.y)] = -2.0
-
 
     def _shuffle(self):
         if not self._shuffled:
@@ -704,7 +703,6 @@ class GPROFConvDataset:
             self.x = self.x[indices]
             self.y = self.y[indices]
             self._shuffled = True
-
 
     def __getitem__(self, i):
         """
@@ -717,22 +715,22 @@ class GPROFConvDataset:
 
         self._shuffled = False
         if self.batch_size is None:
-            return (torch.tensor(self.x[i]),
-                    torch.tensor(self.y[i]))
+            return (torch.tensor(self.x[i]), torch.tensor(self.y[i]))
 
         i_start = self.batch_size * i
         i_end = self.batch_size * (i + 1)
 
+        x = torch.tensor(self.x[i_start:i_end])
+        y = torch.tensor(self.y[i_start:i_end])
+
         if i + 1 == len(self):
-            print("shufflin' ...")
             self._shuffle()
             if not self.binned:
                 self._transform_zero_rain()
 
         if i >= len(self):
             raise IndexError()
-        return (torch.tensor(self.x[i_start:i_end]),
-                torch.tensor(self.y[i_start:i_end]))
+        return x, y
 
     def __len__(self):
         """
@@ -744,18 +742,35 @@ class GPROFConvDataset:
         else:
             return self.x.shape[0]
 
-
-    def evaluate(self,
-                 model,
-                 surface_types,
-                 batch_size=16384,
-                 device=torch.device("cuda")):
+    def evaluate(
+        self,
+        model,
+        surface_types,
+        batch_size=128,
+        device=torch.device("cuda"),
+        log=False,
+    ):
         """
-        Run retrieval on dataset.
+        Run retrieval on test dataset and returns results as
+        xarray Dataset.
+
+        Args:
+            model: The QRNN or DRNN model to evaluate.
+            surface_types: The surface types for all samples in
+                this dataset. They are provided as external argument
+                because using the original data may not be possible if
+                the samples in the dataset have been shuffled.
+            batch_size: The batch size to use for the evaluation.
+            device: On which device to run the evaluation.
+
+        Return:
+            ``xarray.Dataset`` containing the predicted and reference values
+            for the data in this dataset.
         """
         n_samples = self.x.shape[0]
         y_means = []
         y_medians = []
+        y_samples = []
         dy_means = []
         dy_medians = []
         pops = []
@@ -781,12 +796,18 @@ class GPROFConvDataset:
                 i_start += batch_size
 
                 y_pred = model.predict(x)
+                if log:
+                    y_pred = torch.exp(np.log(10) * y_pred)
                 y_mean = model.posterior_mean(y_pred=y_pred)
+                y_sample = model.sample_posterior(y_pred=y_pred).squeeze(1)
                 dy_mean = y_mean - y
-                y_median = model.posterior_quantiles(y_pred=y_pred, quantiles=[0.5]).squeeze(1)
+                y_median = model.posterior_quantiles(
+                    y_pred=y_pred, quantiles=[0.5]
+                ).squeeze(1)
                 dy_median = y_median - y
 
                 y_mean = y_mean.cpu().numpy()
+                y_sample = y_sample.cpu().numpy()
                 dy_mean = dy_mean.cpu().numpy()
                 y_median = y_median.cpu().numpy()
                 dy_median = dy_median.cpu().numpy()
@@ -796,14 +817,15 @@ class GPROFConvDataset:
                 indices = y_true[:, :, :] >= 0.0
                 y_means.append(y_mean[indices])
                 y_medians.append(y_median[indices])
+                y_samples.append(y_sample[indices])
                 dy_means.append(dy_mean[indices])
                 dy_medians.append(dy_median[indices])
                 y_trues.append(y_true[indices])
                 pops.append(pop[indices])
                 surfaces.append(sts[indices])
 
-
         y_means = np.concatenate(y_means, 0)
+        y_samples = np.concatenate(y_samples, 0)
         y_medians = np.concatenate(y_medians, 0)
         dy_means = np.concatenate(dy_means, 0)
         dy_medians = np.concatenate(dy_medians, 0)
@@ -815,11 +837,65 @@ class GPROFConvDataset:
 
         data = {
             "y_mean": (dims, y_means),
+            "y_samples": (dims, y_samples),
             "y_median": (dims, y_medians),
             "dy_mean": (dims, dy_means),
             "dy_median": (dims, dy_medians),
             "y": (dims, y_trues),
             "surface_type": (dims, surfaces),
-            "pop": (dims, pop)
-            }
-        return xarray.Dataset(data)
+            "pop": (dims, pop),
+        }
+        return xr.Dataset(data)
+
+class GPROFConvValidationDataset(GPROFConvDataset):
+    """
+    Specialization of the GPROF convolutional dataset to be used for
+    validation. This class will neither shuffle the data nor replace
+    zero values by zero.
+    """
+    def __init__(
+            self,
+            filename,
+            target="surface_precip",
+            normalize=True,
+            batch_size=None,
+            normalizer=None,
+    ):
+        super().__init__(filename,
+                         target=target,
+                         normalize=normalize,
+                         transform_zero_rain=False,
+                         batch_size=batch_size,
+                         normalizer=normalizer,
+                         shuffle=False,
+                         bins=None)
+
+    def evaluate(
+        self,
+        model,
+        batch_size=32,
+        device=torch.device("cuda"),
+        log=False,
+    ):
+        """
+        Run retrieval on test dataset and returns results as
+        xarray Dataset.
+
+        Args:
+            model: The QRNN or DRNN model to evaluate.
+            batch_size: The batch size to use for the evaluation.
+            device: On which device to run the evaluation.
+
+        Return:
+            ``xarray.Dataset`` containing the predicted and reference values
+            for the data in this dataset.
+        """
+        surface_types = self.get_surface_types()
+        return GPROFConvDataset.evaluate(
+            self,
+            model,
+            surface_types,
+            batch_size=batch_size,
+            device=device,
+            log=log
+        )

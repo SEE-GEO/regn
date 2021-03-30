@@ -7,11 +7,11 @@ from regn.data.csu.sim import SimFileProcessor
 
 # Parse arguments
 parser = argparse.ArgumentParser(description="Extract data from GPROF files.")
-parser.add_argument('sim_file_path', metavar='path', type=str, nargs=1,
+parser.add_argument('sim_file_path', metavar='<sim_file_path>', type=str, nargs=1,
                     help='Path to the root of the directory tree containing the .sim files.')
-parser.add_argument('l1c_path', metavar="path", type=str, nargs=1,
+parser.add_argument('l1c_path', metavar="<l1c_path>", type=str, nargs=1,
                     help='Path to the root of the directory tree containing the L1C files.')
-parser.add_argument('output_file', metavar="path", type=str, nargs=1,
+parser.add_argument('output_file', metavar="<output_path>", type=str, nargs=1,
                     help='Name of the outputfile to store the extracted data to')
 parser.add_argument('--days', metavar='[...]', type=float, nargs="+",
                     help='Day indices for which to extract data for each month.')

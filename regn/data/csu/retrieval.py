@@ -6,6 +6,7 @@ regn.data.csu.retrieval
 This module contains functions to read and convert GPROF retrieval .bin files for GPROF v. 7. """
 import logging
 import gzip
+from pathlib import Path
 
 import numpy as np
 import xarray
@@ -103,25 +104,72 @@ DATA_RECORD_TYPES = np.dtype(
      ]
 )
 
+DATA_RECORD_TYPES_SENSITIVITY = np.dtype(
+    [("pixel_status", "i1"),
+     ("quality_flag", "i1"),
+     ("l1c_quality_flag", "i1"),
+     ("surface_type_index", "i1"),
+     ("tcwv_index", "i1"),
+     ("pop_index", "i1"),
+     ("t2m_index", "i2"),
+     ("airmass_index", "i2"),
+     ("sun_glint_angle", "i1"),
+     ("precip_flag", "i1"),
+
+     ("latitude", "f4"),
+     ("longitude", "f4"),
+
+     ("surface_precip", "f4"),
+     ("surface_precip_1", "f4"),
+     ("surface_precip_2", "f4"),
+     ("dsurface_precip_dy", "15f4"),
+     ("frozen_precip", "f4"),
+     ("convective_precip", "f4"),
+
+     ("rain_water_path", "f4"),
+     ("cloud_water_path", "f4"),
+     ("ice_water_path", "f4"),
+
+     ("most_likely_precip", "f4"),
+     ("precip_1st_tertial", "f4"),
+     ("precip_3rd_tertial", "f4"),
+     ("profile_t2m_index", "i2"),
+     ("profile_number", f"{N_SPECIES}i2"),
+     ("profile_scale", f"{N_SPECIES}f4")
+     ]
+)
+
 class RetrievalFile:
     """
     Interface for GPROF retrieval files.
 
 
     """
-    def __init__(self, filename):
+    def __init__(self, filename, has_sensitivity=False):
+        filename = Path(filename)
         self.filename = filename
-        with gzip.open(filename, "rb") as file:
-            self.data = file.read()
+        if filename.suffix == ".gz":
+            with gzip.open(filename, "rb") as file:
+                self.data = file.read()
+        else:
+            with open(filename, "rb") as file:
+                self.data = file.read()
         self.orbit_header = np.frombuffer(self.data,
                                           ORBIT_HEADER_TYPES,
                                           count=1)
         self.n_scans = self.orbit_header["number_of_scans"][0]
         self.n_pixels = self.orbit_header["number_of_pixels"][0]
+        print(self.n_scans, self.n_pixels)
 
         np.random.seed(self.orbit_header["granule_number"])
         self.scan_indices = np.random.permutation(np.arange(self.n_scans))
         self.pixel_indices = np.random.permutation(np.arange(self.n_pixels))
+
+        if has_sensitivity:
+            self.data_record_types = DATA_RECORD_TYPES_SENSITIVITY
+        else:
+            self.data_record_types = DATA_RECORD_TYPES
+
 
 
     @staticmethod
@@ -175,10 +223,10 @@ class RetrievalFile:
         """
         offset = ORBIT_HEADER_TYPES.itemsize + PROFILE_INFO_TYPES.itemsize
         offset += i * (SCAN_HEADER_TYPES.itemsize
-                       + self.n_pixels * DATA_RECORD_TYPES.itemsize)
+                       + self.n_pixels * self.data_record_types.itemsize)
         offset += SCAN_HEADER_TYPES.itemsize
         return np.frombuffer(self.data,
-                             DATA_RECORD_TYPES,
+                             self.data_record_types,
                              count=self.n_pixels,
                              offset=offset)
 
@@ -196,7 +244,7 @@ class RetrievalFile:
 
         offset = ORBIT_HEADER_TYPES.itemsize + PROFILE_INFO_TYPES.itemsize
         offset += i * (SCAN_HEADER_TYPES.itemsize
-                       + self.n_pixels * DATA_RECORD_TYPES.itemsize)
+                       + self.n_pixels * self.data_record_types.itemsize)
         return np.frombuffer(self.data,
                              SCAN_HEADER_TYPES,
                              count=1,
@@ -207,13 +255,15 @@ class RetrievalFile:
         Return data in file as xarray dataset.
         """
         data = {k: np.zeros((self.n_scans, self.n_pixels) + d[0].shape)
-                for k, d in DATA_RECORD_TYPES.fields.items()}
+                for k, d in self.data_record_types.fields.items()}
         for i, s in enumerate(self.scans):
             for k, d in data.items():
                 d[i] = s[k]
 
         dims = ["scans", "pixels", "channels"]
-        data = {k: (dims[:len(d.shape)], d) for k, d in data.items()}
+        data = {k: (dims[:len(d.shape)], d) for k, d in data.items()
+                if not k.startswith("profile")
+                }
         return xarray.Dataset(data)
 
 

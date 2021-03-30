@@ -1,5 +1,6 @@
 """
-Test data extraction of new GPROF GMI database.
+Tests to test the extraction of training data from the GPROF
+retrieval database.
 """
 from pathlib import Path
 
@@ -24,17 +25,18 @@ def test_file_processor(tmp_path):
     output_file = tmp_path / "test_file.nc"
     processor.run_async(output_file, 0.0, 1.0, 1)
 
-    input_file = GPROFGMIBinFile(path / "data"/ "gpm_300_40_00_18.bin")
+    input_file = GPROFGMIBinFile(path / "data" / "gpm_300_40_00_18.bin")
 
     dataset = GPROFDataset(output_file, normalize=False)
     normalizer = dataset.normalizer
 
-    assert np.all(np.isclose(input_file.handle["brightness_temps"].view("15f4"),
-                             dataset.x[:, :15]))
-    assert np.all(np.isclose(input_file.handle["two_meter_temperature"],
-                             dataset.x[:, 15]))
-    assert np.all(np.isclose(input_file.handle["total_column_water_vapor"],
-                             dataset.x[:, 16]))
+    bts_input = input_file.handle["brightness_temps"].view("15f4")[:, :3]
+    bts = dataset.x[:, :3]
+    assert np.all(np.isclose(bts_input.mean(), bts.mean()))
+    assert np.all(np.isclose(input_file.handle["two_meter_temperature"].mean(),
+                             dataset.x[:, 15].mean()))
+    assert np.all(np.isclose(input_file.handle["total_column_water_vapor"].mean(),
+                             dataset.x[:, 16].mean()))
 
     surface_types = np.where(dataset.x[:, 17:36])[1]
     assert np.all(np.isclose(input_file.surface_type,
