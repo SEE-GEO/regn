@@ -429,25 +429,25 @@ class FileProcessor:
                 rain_mask = (mask > 0).astype(np.float32)
                 rain_fraction[i, j] = np.sum(weights * rain_mask)
 
-                warm_strat_mask = mask.isin([1, 2]).astype(np.float32)
+                warm_strat_mask = np.isin(mask, [1, 2]).astype(np.float32)
                 warm_strat_fraction[i, j] = np.sum(weights * warm_strat_mask)
 
-                cold_strat_mask = mask.isin([10]).astype(np.float32)
+                cold_strat_mask = np.isin(mask, [10]).astype(np.float32)
                 cold_strat_fraction[i, j] = np.sum(weights * cold_strat_mask)
 
-                snow_mask = mask.isin([3, 4]).astype(np.float32)
+                snow_mask = np.isin(mask, [3, 4]).astype(np.float32)
                 snow_fraction[i, j] = np.sum(weights * snow_mask)
 
-                conv_mask = mask.isin([6.0]).astype(np.float32)
+                conv_mask = np.isin(mask, [6.0]).astype(np.float32)
                 conv_fraction[i, j] = np.sum(weights * conv_mask)
 
-                hail_mask = mask.isin([7.0]).astype(np.float32)
+                hail_mask = np.isin(mask, [7.0]).astype(np.float32)
                 hail_fraction[i, j] = np.sum(weights * hail_mask)
 
-                trop_strat_mask = mask.isin([91.0]).astype(np.float32)
+                trop_strat_mask = np.isin(mask, [91.0]).astype(np.float32)
                 tropical_strat_fraction[i, j] = np.sum(weights * trop_strat_mask)
 
-                trop_conv_mask = mask.isin([96.0]).astype(np.float32)
+                trop_conv_mask = np.isin(mask, [96.0]).astype(np.float32)
                 tropical_conv_fraction[i, j] = np.sum(weights * trop_conv_mask)
 
         match_data = {}
@@ -553,7 +553,7 @@ class FileProcessor:
 
         date = self.granules[granule_number]
         preprocessor_output_path = (self.output_path / "preprocessor"
-                                    / f"{date.year}" / f"date.month")
+                                    / f"{date.year}" / f"{date.month}")
         preprocessor_output_path.mkdir(parents=True, exist_ok=True)
         matchup_output_path = (self.output_path / "match_ups"
                                / f"{date.year}" / f"date.month")
