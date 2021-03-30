@@ -5,6 +5,7 @@ regn.data.validation
 
 This module provides class to read in the MRMS validation data for GPM.
 """
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timedelta
 import os
 from pathlib import Path
@@ -15,15 +16,24 @@ import subprocess
 import numpy as np
 from pykdtree.kdtree import KDTree
 from pyproj import Transformer
+from tqdm import tqdm
 import xarray as xr
 
 from regn.data.csu.l1c import L1CFile
 
 
-PRECIPRATE_REGEX = re.compile("PRECIPRATE\.GC\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz")
-MASK_REGEX = re.compile("MASK\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz")
-RQI_REGEX = re.compile("RQI\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz")
-FILE_REGEX = re.compile("[\w*\.]*\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz")
+PRECIPRATE_REGEX = re.compile(
+    r"PRECIPRATE\.GC\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz"
+)
+MASK_REGEX = re.compile(
+    r"MASK\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz"
+)
+RQI_REGEX = re.compile(
+    r"RQI\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz"
+)
+FILE_REGEX = re.compile(
+    r"[\w*\.]*\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz"
+)
 
 def local_east(xyz):
     """
@@ -264,46 +274,6 @@ def open_validation_dataset(granule_number, base_directory):
 
 _WGS84_TO_ECEF = Transformer.from_crs("epsg:4326", "epsg:4978")
 _ECEF_TO_WGS84 = Transformer.from_crs("epsg:4978", "epsg:4326")
-_KD_TREE = None
-
-def find_closest_mrms_pixel(lat, lon, mrms_data):
-    """
-    Finds the coordinates of the MRMS pixel that is closest to
-    a given point.
-
-    Args:
-        lat: The latitude position of the point.
-        lon: The longitude position of the point.
-        mrms_data: Dataset containing the MRMS data.
-
-    Return:
-        Tuple ``(ri, ci)`` containing the row index ``ri`` and column index
-        ``ci`` of the closes pixel in the MRMS grid or ``None`` if the closest
-        point is more than 5000m away.
-    """
-    global _KD_TREE
-
-    if _KD_TREE is None:
-        lons = mrms_data["longitude"]
-        lats = mrms_data["latitude"]
-        lons, lats = np.meshgrid(lons, lats)
-
-        xyz = np.stack(_WGS84_TO_ECEF.transform(lats,
-                                                lons,
-                                                np.zeros_like(lats)), axis=-1)
-        xyz = xyz.reshape(-1, 3)
-        _KD_TREE = KDTree(xyz)
-
-    xyz = np.stack(_WGS84_TO_ECEF.transform(lat, lon, 0), axis=-1)
-    dist, idx = _KD_TREE.query(xyz.reshape(1, -1))
-
-    if dist > 5e3:
-        return None
-
-    NX = mrms_data.longitude.size
-    row_index = idx[0] // NX
-    column_index = idx[0] % NX
-    return row_index, column_index
 
 def run_preprocessor(l1c_file,
                       output_file):
@@ -321,19 +291,31 @@ def run_preprocessor(l1c_file,
         prepdir = "/qdata2/archive/ERA5"
         ancdir = "/qdata1/pbrown/gpm/ancillary"
         ingestdir = "/qdata1/pbrown/gpm/ppingest"
-        subprocess.run(["gprof2020pp_GMI_L1C",
-                        jobid,
-                        prodtype, str(l1c_file),
-                        prepdir,
-                        ancdir,
-                        ingestdir,
-                        str(output_file)])
+        try:
+            subprocess.run(["gprof2020pp_GMI_L1C",
+                            jobid,
+                            prodtype, str(l1c_file),
+                            prepdir,
+                            ancdir,
+                            ingestdir,
+                            str(output_file)])
+        except Exception as e:
+            print("Running the preprocessor failed whith the following"
+                  f"exception: {e}")
 
 
 class FileProcessor:
     """
     Processor class to match GPM GMI observations with MRMS validation data and
     extract validation data.
+
+    .. note ::
+
+        The FileProcessor object caches the KDTree used to find the nearest
+        MRMS pixel which means that one and the same object can only be used
+        to process data from the same MRMS spatial grid. This, however, should
+        not be an issue in practice because the grid is expected to be
+        constant.
     """
     def __init__(self,
                  validation_data_path,
@@ -343,6 +325,7 @@ class FileProcessor:
         self.l1c_data_path = Path(l1c_data_path)
         self.output_path = Path(output_path)
         self.granules = list_overpasses(validation_data_path)
+        self._kd_tree = None
 
     def match_granule(self,
                       granule_number,
@@ -353,6 +336,7 @@ class FileProcessor:
 
         lats = l1c_data["latitude"]
         lons = l1c_data["longitude"]
+
 
         precip_rate = np.zeros(lats.shape)
         rain_fraction = np.zeros(lats.shape)
@@ -386,7 +370,7 @@ class FileProcessor:
             for j in range(n_pixels):
                 lon = lons[i, j]
                 lat = lats[i, j]
-                coords = find_closest_mrms_pixel(lat, lon, mrms_data)
+                coords = self.find_closest_mrms_pixel(lat, lon, mrms_data)
                 if coords is None:
                     precip_rate[i, j] = np.nan
                     continue
@@ -543,6 +527,44 @@ class FileProcessor:
         )
         return xr.Dataset(match_data)
 
+    def find_closest_mrms_pixel(self, lat, lon, mrms_data):
+        """
+        Finds the coordinates of the MRMS pixel that is closest to
+        a given point.
+
+        Args:
+            lat: The latitude position of the point.
+            lon: The longitude position of the point.
+            mrms_data: Dataset containing the MRMS data.
+
+        Return:
+            Tuple ``(ri, ci)`` containing the row index ``ri`` and column index
+            ``ci`` of the closes pixel in the MRMS grid or ``None`` if the closest
+            point is more than 5000m away.
+        """
+
+        if self._kd_tree is None:
+            lons = mrms_data["longitude"]
+            lats = mrms_data["latitude"]
+            lons, lats = np.meshgrid(lons, lats)
+
+            xyz = np.stack(_WGS84_TO_ECEF.transform(lats,
+                                                    lons,
+                                                    np.zeros_like(lats)), axis=-1)
+            xyz = xyz.reshape(-1, 3)
+            self._kd_tree = KDTree(xyz)
+
+        xyz = np.stack(_WGS84_TO_ECEF.transform(lat, lon, 0), axis=-1)
+        dist, idx = self._kd_tree.query(xyz.reshape(1, -1), 1)
+
+        if dist > 5e3:
+            return None
+
+        NX = mrms_data.longitude.size
+        row_index = idx[0] // NX
+        column_index = idx[0] % NX
+        return row_index, column_index
+
     def process_granule(self,
                         granule_number):
         if granule_number not in self.granules:
@@ -556,10 +578,10 @@ class FileProcessor:
                                     / f"{date.year}" / f"{date.month}")
         preprocessor_output_path.mkdir(parents=True, exist_ok=True)
         matchup_output_path = (self.output_path / "match_ups"
-                               / f"{date.year}" / f"date.month")
+                               / f"{date.year}" / f"{date.month:02}")
         matchup_output_path.mkdir(parents=True, exist_ok=True)
 
-        roi = [-130, 20, 60.0, 55]
+        roi = [-130, 20, -60.0, 55]
         _, l1c_file_sub = tempfile.mkstemp()
         try:
             # Extract scans over CONUS
@@ -582,27 +604,27 @@ class FileProcessor:
         finally:
             Path(l1c_file_sub).unlink()
 
-    def process_month(self, year, month):
-        # 1. Find granules
+    def process_month(self,
+                      year,
+                      month,
+                      n_workers=4):
+        """
+        Parallel processing of match ups for a given month.
+
+        Args:
+            year: The year the month of which to process
+                as integer.
+            month: The month to process as integer
+            n_workers: The number of processes to use for
+                 parallelization.
+        """
         granules = [g for (g, d) in self.granules.items() if
                     d.year == year and d.month == month]
 
-        # 2. Run preprocessor, store output
+        pool = ProcessPoolExecutor(max_workers=4)
+        tasks = []
+        for g in granules:
+            tasks.append(pool.submit(self.process_granule, g))
 
-        # 3. Match observations, store output
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        for t in tqdm(tasks):
+            t.result()

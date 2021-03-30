@@ -14,12 +14,20 @@ import xarray as xr
 
 class L1CFile:
     """
-
-
+    Basic functionality to read and write GPROF GMI L1C files.
     """
-
     @staticmethod
     def open_granule(granule, path, date=None):
+        """
+        Find and open L1C file with a given granule number.
+
+        Args:
+            granule: The granule number as integer.
+            path: The root of the directory tree containing the
+                L1C files.
+            date: The date of the file used to determine sub-folders
+                corresponding to month and day.
+        """
         if date is not None:
             year = date.year - 2000
             month = date.month
@@ -38,12 +46,18 @@ class L1CFile:
                 f"Could not find a L1C file with granule number {granule}."
             )
 
-
     def __init__(self, path):
+        """
+        Open a GPROG GMI L1C file.
+
+        Args:
+            path: The path to the file.
+        """
         self.filename = path
         self.path = Path(path)
 
     def __repr__(self):
+        """String representation for file."""
         return f"L1CFile(filename='{self.path.name}')"
 
     def extract_scans(self, roi, output_filename):
@@ -126,20 +140,18 @@ class L1CFile:
 
     def extract_scans_and_pixels(self,
                                  scans,
-                                 pixels,
                                  output_filename):
         """
-        Extract scans over a rectangular region of interest (ROI).
+        Extract first pixel from each scan in file.
+
+        The main purposed of this method is to simplify the generation
+        of small files for testing purposes.
 
         Args:
-            roi: The region of interest given as an length-4 iterable
-                 containing the lower-left corner longitude and latitude
-                 coordinates followed by the upper-right corner longitude
-                 and latitude coordinates.
+            scans: Indices of the scans to extract.
             output_filename: Name of the file to which to write the extracted
                  scans.
         """
-
         with h5py.File(self.path, "r") as input:
             lats = input["S1/Latitude"][scans, 0]
             lons = input["S1/Longitude"][scans, 0]
@@ -148,7 +160,7 @@ class L1CFile:
 
                 g = output.create_group("S1")
                 n_scans = len(scans)
-                n_pixels = len(pixels)
+                n_pixels = 1
                 for name, item in input["S1"].items():
                     if isinstance(item, h5py.Dataset):
                         shape = item.shape
@@ -220,6 +232,12 @@ class L1CFile:
                     output.attrs[a] = input.attrs[a]
 
     def open(self):
+        """
+        Read data into xarray.Dataset.
+
+        Returns:
+            An xarray.Dataset containing the data from this L1C file.
+        """
         with h5py.File(self.path, "r") as input:
 
             lats = input["S1/Latitude"][:]
