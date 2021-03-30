@@ -7,10 +7,13 @@ Functionality to read L1C files.
 """
 from datetime import datetime
 from pathlib import Path
+import re
 
 import numpy as np
 import h5py
 import xarray as xr
+
+_RE_META_INFO = re.compile("NumberScansGranule=(\d*);")
 
 class L1CFile:
     """
@@ -96,7 +99,10 @@ class L1CFile:
                                          data=item[indices])
 
                 for a in input["S1"].attrs:
-                    g.attrs[a] = input["S1"].attrs[a]
+                    s = input["S1"].attrs[a].decode()
+                    s = _RE_META_INFO.sub(f"NumberScansGranule={n_scans};", s)
+                    s = s.encode()
+                    g.attrs[a] = s
 
                 g_st = g.create_group("ScanTime")
                 for name, item in input["S1/ScanTime"].items():
@@ -122,7 +128,10 @@ class L1CFile:
                                          shape=(n_scans, ) + shape[1:],
                                          data=item[indices])
                 for a in input["S2"].attrs:
-                    g.attrs[a] = input["S2"].attrs[a]
+                    s = input["S2"].attrs[a].decode()
+                    s = _RE_META_INFO.sub(f"NumberScansGranule={n_scans};", s)
+                    s = s.encode()
+                    g.attrs[a] = s
 
                 g_st = g.create_group("ScanTime")
                 for name, item in input["S2/ScanTime"].items():
