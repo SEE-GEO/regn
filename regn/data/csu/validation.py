@@ -575,7 +575,7 @@ class FileProcessor:
 
         date = self.granules[granule_number]
         preprocessor_output_path = (self.output_path / "preprocessor"
-                                    / f"{date.year}" / f"{date.month}")
+                                    / f"{date.year}" / f"{date.month:02}")
         preprocessor_output_path.mkdir(parents=True, exist_ok=True)
         matchup_output_path = (self.output_path / "match_ups"
                                / f"{date.year}" / f"{date.month:02}")
