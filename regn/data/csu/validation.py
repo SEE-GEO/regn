@@ -285,23 +285,22 @@ def run_preprocessor(l1c_file,
              using the preprocessor.
     """
     output_file = Path(output_file)
-    if not output_file.exists():
-        jobid = str(os.getpid()) + "_pp"
-        prodtype = "CLIMATOLOGY"
-        prepdir = "/qdata2/archive/ERA5"
-        ancdir = "/qdata1/pbrown/gpm/ancillary"
-        ingestdir = "/qdata1/pbrown/gpm/ppingest"
-        try:
-            subprocess.run(["gprof2020pp_GMI_L1C",
-                            jobid,
-                            prodtype, str(l1c_file),
-                            prepdir,
-                            ancdir,
-                            ingestdir,
-                            str(output_file)])
-        except Exception as e:
-            print("Running the preprocessor failed whith the following"
-                  f"exception: {e}")
+    jobid = str(os.getpid()) + "_pp"
+    prodtype = "CLIMATOLOGY"
+    prepdir = "/qdata2/archive/ERA5/"
+    ancdir = "/qdata1/pbrown/gpm/ppancillary/"
+    ingestdir = "/qdata1/pbrown/gpm/ppingest/"
+    try:
+        subprocess.run(["gprof2020pp_GMI_L1C",
+                        jobid,
+                        prodtype, str(l1c_file),
+                        prepdir,
+                        ancdir,
+                        ingestdir,
+                        str(output_file)])
+    except Exception as e:
+        print("Running the preprocessor failed whith the following"
+              f"exception: {e}")
 
 
 class FileProcessor:
@@ -441,7 +440,7 @@ class FileProcessor:
         )
         match_data["longitude"] = (
             ("scans", "pixels"),
-            l1c_data["latitude"].data
+            l1c_data["longitude"].data
         )
         match_data["scan_time"] = (
             ("scans",),
@@ -456,7 +455,7 @@ class FileProcessor:
         )
         match_data["radar_quality_index"] = (
             ("scans", "pixels"),
-            precip_rate,
+            radar_quality_index,
             {"description":
              "Footprint-averaged radar quality index."
             }
@@ -621,7 +620,7 @@ class FileProcessor:
         granules = [g for (g, d) in self.granules.items() if
                     d.year == year and d.month == month]
 
-        pool = ProcessPoolExecutor(max_workers=4)
+        pool = ProcessPoolExecutor(max_workers=n_workers)
         tasks = []
         for g in granules:
             tasks.append(pool.submit(self.process_granule, g))
