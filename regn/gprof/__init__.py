@@ -149,7 +149,7 @@ class InputData(Dataset):
 
     def write_retrieval_results(self, path, results):
         preprocessor_file = PreprocessorFile(self.filename)
-        preprocessor_file.write_retrieval_results(path, results)
+        return preprocessor_file.write_retrieval_results(path, results)
 
 
     def __len__(self):
