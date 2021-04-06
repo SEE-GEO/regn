@@ -276,7 +276,7 @@ _WGS84_TO_ECEF = Transformer.from_crs("epsg:4326", "epsg:4978")
 _ECEF_TO_WGS84 = Transformer.from_crs("epsg:4978", "epsg:4326")
 
 def run_preprocessor(l1c_file,
-                      output_file):
+                     output_file):
     """
     Run preprocessor on L1C GMI file.
 
@@ -400,6 +400,7 @@ class FileProcessor:
 
                 if mrms_sub.time.size > 2:
                     mrms_sub = mrms_sub.interp({"time": time})
+
 
                 precip_rate[i, j] = np.sum(
                     weights * mrms_sub["precip_rate"].data[0]

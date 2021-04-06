@@ -28,12 +28,12 @@ def run_retrieval(f):
     stem = f.stem
     subprocess.run(["GPROF_2020_V1",
                     str(f),
-                    str(output_path / (stem + ".pp")),
+                    str(output_path / (stem + ".BIN")),
                     str(log_path / (stem + ".log")),
                     "/qdata1/pbrown/gpm/ancillary/",
                     "0"])
 
-pool = ProcessPoolExecutor(max_workers=8)
+pool = ProcessPoolExecutor(max_workers=42)
 tasks = []
 for f in files:
     tasks.append(pool.submit(run_retrieval, f))

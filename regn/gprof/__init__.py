@@ -86,7 +86,6 @@ class InputData(Dataset):
         p_n_l = dn // 2
         p_n_r = dn - p_n_l
 
-        print(p_n_l, p_n_r, p_m_l, p_m_r)
 
         bts = self.data["brightness_temperatures"].data.copy()
         bts[bts < 0.0] = np.nan
@@ -105,9 +104,7 @@ class InputData(Dataset):
 
 
     def run_retrieval(self, qrnn):
-        quantiles = qrnn.quantiles
 
-        y_pred = np.zeros((self.n_scans, self.n_pixels, len(quantiles)))
         mean = np.zeros((self.n_scans, self.n_pixels))
         first_tertial = np.zeros((self.n_scans, self.n_pixels))
         second_tertial = np.zeros((self.n_scans, self.n_pixels))
@@ -115,13 +112,11 @@ class InputData(Dataset):
 
         with torch.no_grad():
             for i in range(len(self)):
-                print(i, len(self))
                 x = self[i]
                 y = qrnn.predict(x)
 
                 i_start = i * self.scans_per_batch
                 i_end = (i + 1) * self.scans_per_batch
-                y_pred[i_start:i_end, :, :] = y.reshape(-1, self.n_pixels, len(quantiles)).numpy()
 
                 means = qrnn.posterior_mean(y_pred=y)
                 mean[i_start:i_end] = means.reshape(-1, self.n_pixels).numpy()
@@ -135,11 +130,9 @@ class InputData(Dataset):
                 pop[i_start:i_end] = p.reshape(-1, self.n_pixels).numpy()
 
 
-        dims = ["scans", "pixels", "quantiles"]
+        dims = ["scans", "pixels"]
 
         data = {
-            "quantiles": (("quantiles",), quantiles),
-            "precip_quantiles": (dims, y_pred),
             "precip_mean": (dims[:2], mean),
             "precip_1st_tertial": (dims[:2], first_tertial),
             "precip_3rd_tertial": (dims[:2], second_tertial),
