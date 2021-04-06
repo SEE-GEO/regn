@@ -20,6 +20,7 @@ from tqdm import tqdm
 import xarray as xr
 
 from regn.data.csu.l1c import L1CFile
+from regn.data.csu.retrieval import RetrievalFile
 
 
 PRECIPRATE_REGEX = re.compile(
@@ -269,7 +270,7 @@ def open_validation_dataset(granule_number, base_directory):
         "radar_quality_index": (dims, rqi)
     }
 
-    return xr.Dataset(data)
+    return xr.Dataset(data).sortby(["time"])
 
 
 _WGS84_TO_ECEF = Transformer.from_crs("epsg:4326", "epsg:4978")
@@ -398,9 +399,9 @@ class FileProcessor:
                     "longitude": slice(ci - DX, ci + DX + 1),
                 }]
 
+
                 if mrms_sub.time.size > 2:
                     mrms_sub = mrms_sub.interp({"time": time})
-
 
                 precip_rate[i, j] = np.sum(
                     weights * mrms_sub["precip_rate"].data[0]
@@ -581,7 +582,9 @@ class FileProcessor:
                                / f"{date.year}" / f"{date.month:02}")
         matchup_output_path.mkdir(parents=True, exist_ok=True)
 
-        roi = [-130, 20, -60.0, 55]
+        #roi = [-130, 20, -60.0, 55]
+        roi = [-110, 30, -100.0, 40]
+
         _, l1c_file_sub = tempfile.mkstemp()
         try:
             # Extract scans over CONUS
@@ -593,7 +596,7 @@ class FileProcessor:
             # Run preprocessor
             preprocessor_output = (preprocessor_output_path /
                                    (Path(l1c_file.filename).stem + ".pp"))
-            run_preprocessor(l1c_file_sub, preprocessor_output)
+            #run_preprocessor(l1c_file_sub, preprocessor_output)
 
             # Process granule
             matchup_output = (matchup_output_path /
@@ -628,3 +631,290 @@ class FileProcessor:
 
         for t in tqdm(tasks):
             t.result()
+
+def _get_date(filename):
+    return datetime.strptime(filename.split(".")[4][:8], "%Y%m%d")
+
+def _get_granule_number(filename):
+    return int(filename.split(".")[5])
+
+class ResultProcessor:
+    """
+    Processor class to extract retrieval results from different retrievals
+    and combine them into a single file for each month.
+    """
+    def __init__(self,
+                 match_up_path,
+                 gprof_path,
+                 qprof_path,
+                 qprof_conv_path=None):
+        self.match_up_path = Path(match_up_path)
+        self.gprof_path = Path(gprof_path)
+        self.qprof_path = Path(qprof_path)
+
+        if qprof_conv_path is None:
+            self.qprof_conv_path = None
+        else:
+            self.qprof_conv_path = Path(qprof_conv_path)
+
+        self._find_files()
+
+
+    def _find_files(self):
+
+        validation_files = {}
+
+        files = self.match_up_path.glob("**/*.nc")
+        for f in files:
+            granule_number = _get_granule_number(f.name)
+            d = validation_files.setdefault(granule_number, {})
+            d["date"] = _get_date(f.name)
+            d["match_up_file"] = f
+
+        self.match_up_files = {f: _get_date(f.name) for f in files}
+
+        files = self.gprof_path.glob("**/*.BIN.gz")
+        for f in files:
+            granule_number = _get_granule_number(f.name)
+            d = validation_files.setdefault(granule_number, {})
+            d["gprof_file"] = f
+        self.gprof_files = {f: _get_date(f.name) for f in files}
+
+        files = self.qprof_path.glob("**/*.BIN.gz")
+        for f in files:
+            granule_number = _get_granule_number(f.name)
+            d = validation_files.setdefault(granule_number, {})
+            d["qprof_file"] = f
+        self.qprof_files = {f: _get_date(f.name) for f in files}
+
+        self.validation_files = validation_files
+
+    def process_month(self,
+                      year,
+                      month,
+                      output_path):
+        files = {gn: fs for gn, fs in self.validation_files.items()
+                 if fs["date"].year == year
+                 and fs["date"].month == month}
+
+        parts = []
+
+        for gn, fs in files.items():
+            match_up_file = fs["match_up_file"]
+            gprof_file = fs["gprof_file"]
+            qprof_file = fs["qprof_file"]
+
+            match_up_data = xr.load_dataset(match_up_file)
+            gprof_data = RetrievalFile(gprof_file, has_sensitivity=True).to_xarray_dataset()
+            qprof_data = RetrievalFile(qprof_file).to_xarray_dataset()
+
+            match_up_data = match_up_data.stack(samples=("scans", "pixels"))
+            gprof_data = gprof_data.stack(samples=("scans", "pixels"))
+            qprof_data = qprof_data.stack(samples=("scans", "pixels"))
+
+            valid = np.isfinite(match_up_data["surface_precipitation"])
+            valid *= gprof_data["surface_precip"] >= 0.0
+
+            match_up_data = match_up_data.isel(samples=valid).rename(
+                {"surface_precipitation": "surface_precip_mrms"}
+            )
+            gprof_data = gprof_data.isel(samples=valid)
+            gprof_data = gprof_data[["surface_precip"]].rename(
+                {"surface_precip": "surface_precip_gprof"}
+            )
+            qprof_data = qprof_data.isel(samples=valid)
+            qprof_data = qprof_data[["surface_precip"]].rename(
+                {"surface_precip": "surface_precip_qprof"}
+            )
+            merged = xr.merge([match_up_data, gprof_data, qprof_data])
+            parts.append(merged.reset_index("samples"))
+
+        results = xr.concat(parts, dim="samples")
+
+        output_path = Path(output_path)
+        if output_path.is_dir():
+            output_path = output_path = f"validation_results_{year}_{month:02}.nc"
+        results.to_netcdf(output_path)
+
+    def plot_granule(self,
+                     granule,
+                     mark_fns=False):
+        import matplotlib.pyplot as plt
+        import cartopy.crs as ccrs
+        from matplotlib.colors import LogNorm, Normalize
+        from matplotlib.gridspec import GridSpec
+
+        try:
+            fs = self.validation_files[granule]
+        except KeyError:
+            raise Exception(f"No validation data available for granule {granule}.")
+
+        match_up_file = fs["match_up_file"]
+        gprof_file = fs["gprof_file"]
+        qprof_file = fs["qprof_file"]
+
+        mrms_data = xr.load_dataset(match_up_file)
+        gprof_data = RetrievalFile(gprof_file, has_sensitivity=True).to_xarray_dataset()
+        qprof_data = RetrievalFile(qprof_file).to_xarray_dataset()
+
+        gs = GridSpec(2, 2)
+        f = plt.figure(figsize=(15, 15))
+
+        rain_norm = LogNorm(1e-2, 1e2)
+        lats = mrms_data["latitude"]
+        lons = mrms_data["longitude"]
+        valid = gprof_data["surface_precip"] >= 0.0
+
+        rqi = mrms_data["radar_quality_index"]
+        ax = plt.subplot(gs[0, 0], projection=ccrs.PlateCarree())
+        ax.plot(lons[:, 0], lats[:, 0], ls="--", c="grey")
+        ax.plot(lons[:, -1], lats[:, -1], ls="--", c="grey")
+        ax.pcolormesh(lons, lats, rqi, norm=Normalize(0, 1))
+        ax.coastlines()
+
+        p_mrms = mrms_data["surface_precipitation"]
+        p = mrms_data["surface_precipitation"]
+        p = np.maximum(p, 1e-3)
+        ax = plt.subplot(gs[0, 1], projection=ccrs.PlateCarree())
+        ax.plot(lons[:, 0], lats[:, 0], ls="--", c="grey")
+        ax.plot(lons[:, -1], lats[:, -1], ls="--", c="grey")
+        ax.pcolormesh(lons, lats, p, norm=rain_norm)
+        ax.coastlines()
+
+        p_qprof = qprof_data["surface_precip"]
+        p = qprof_data["surface_precip"].data
+        p[~valid] = np.nan
+        ax = plt.subplot(gs[1, 0], projection=ccrs.PlateCarree())
+        ax.pcolormesh(lons, lats, p, norm=rain_norm)
+        ax.plot(lons[:, 0], lats[:, 0], ls="--", c="grey")
+        ax.plot(lons[:, -1], lats[:, -1], ls="--", c="grey")
+        fns = (p_qprof <= 1e-2)  * (p_mrms > 1e-2)
+        ax.scatter(lons.data[fns], lats.data[fns], c="white", marker=".", alpha=1.0)
+        ax.coastlines()
+
+        p_gprof = gprof_data["surface_precip"]
+        p = gprof_data["surface_precip"]
+        ax = plt.subplot(gs[1, 1], projection=ccrs.PlateCarree())
+        ax.pcolormesh(lons, lats, p, norm=rain_norm)
+        ax.plot(lons[:, 0], lats[:, 0], ls="--", c="grey")
+        ax.plot(lons[:, -1], lats[:, -1], ls="--", c="grey")
+        fns = (p_gprof <= 1e-2)  * (p_mrms > 1e-2)
+        ax.scatter(lons.data[fns], lats.data[fns], c="white", marker=".", alpha=0.2)
+        ax.coastlines()
+
+        plt.show()
+
+        return f
+
+    def plot_errors(self,
+                    granule,
+                    mark_fns=False):
+        import matplotlib.pyplot as plt
+        import cartopy.crs as ccrs
+        from matplotlib.colors import LogNorm, Normalize
+        from matplotlib.gridspec import GridSpec
+
+        try:
+            fs = self.validation_files[granule]
+        except KeyError:
+            raise Exception(f"No validation data available for granule {granule}.")
+
+        match_up_file = fs["match_up_file"]
+        gprof_file = fs["gprof_file"]
+        qprof_file = fs["qprof_file"]
+
+        mrms_data = xr.load_dataset(match_up_file)
+        gprof_data = RetrievalFile(gprof_file, has_sensitivity=True).to_xarray_dataset()
+        qprof_data = RetrievalFile(qprof_file).to_xarray_dataset()
+
+        gs = GridSpec(1, 2)
+        f = plt.figure(figsize=(15, 15))
+
+        rain_norm = LogNorm(1e-2, 1e2)
+        error_norm = Normalize(-1, 1)
+
+        lats = mrms_data["latitude"]
+        lons = mrms_data["longitude"]
+        valid = gprof_data["surface_precip"] >= 0.0
+
+        p_mrms = mrms_data["surface_precipitation"].data
+
+        p_qprof = qprof_data["surface_precip"].data
+        e = (p_qprof - p_mrms) / np.maximum(p_qprof, p_mrms)
+        e[~valid] = np.nan
+        e[p_mrms < 1e-2] = np.nan
+
+        ax = plt.subplot(gs[0, 0], projection=ccrs.PlateCarree())
+        ax.pcolormesh(lons, lats, e, norm=error_norm, cmap="coolwarm")
+        ax.plot(lons[:, 0], lats[:, 0], ls="--", c="grey")
+        ax.plot(lons[:, -1], lats[:, -1], ls="--", c="grey")
+        ax.coastlines()
+
+        p_gprof = gprof_data["surface_precip"].data
+        e = (p_gprof - p_mrms) / np.maximum(p_gprof, p_mrms)
+        e[~valid] = np.nan
+        e[p_mrms < 1e-2] = np.nan
+        ax = plt.subplot(gs[0, 1], projection=ccrs.PlateCarree())
+        ax.pcolormesh(lons, lats, e, norm=error_norm, cmap="coolwarm")
+        ax.plot(lons[:, 0], lats[:, 0], ls="--", c="grey")
+        ax.plot(lons[:, -1], lats[:, -1], ls="--", c="grey")
+        ax.coastlines()
+
+        plt.show()
+
+        return f
+
+    def plot_contours(self,
+                      granule,
+                      mrms_input_data=None):
+        import matplotlib.pyplot as plt
+        import cartopy.crs as ccrs
+        from matplotlib.colors import LogNorm, Normalize
+        from matplotlib.gridspec import GridSpec
+
+        try:
+            fs = self.validation_files[granule]
+        except KeyError:
+            raise Exception(f"No validation data available for granule {granule}.")
+
+        match_up_file = fs["match_up_file"]
+        gprof_file = fs["gprof_file"]
+        qprof_file = fs["qprof_file"]
+
+        mrms_data = xr.load_dataset(match_up_file)
+        gprof_data = RetrievalFile(gprof_file, has_sensitivity=True).to_xarray_dataset()
+        qprof_data = RetrievalFile(qprof_file).to_xarray_dataset()
+
+        gs = GridSpec(1, 1)
+        f = plt.figure(figsize=(15, 15))
+        levels = [1e0]#np.logspace(0, 2, 5)
+
+        lats = mrms_data["latitude"]
+        lons = mrms_data["longitude"]
+        valid = gprof_data["surface_precip"] >= 0.0
+
+        rain_norm = LogNorm(1e-2, 1e2)
+        p_mrms = mrms_data["surface_precipitation"].data
+        p_qprof = qprof_data["surface_precip"].data
+        p_gprof = gprof_data["surface_precip"].data
+
+        ax = plt.subplot(gs[0, 0], projection=ccrs.PlateCarree())
+        ax.contourf(lons, lats, np.maximum(p_mrms, 1e-2), cmap="plasma", norm=rain_norm)
+        ax.contour(lons, lats, p_gprof, levels=levels, cmap="Blues", norm=rain_norm)
+        ax.contour(lons, lats, p_qprof, levels=levels, cmap="Greens", norm=rain_norm)
+
+        #ax.scatter(lons, lats, marker=".", s=2, cmap="Greys", c="grey")
+
+        if mrms_input_data is not None:
+            lats = mrms_input_data["latitude"]
+            lons = mrms_input_data["longitude"]
+            p = mrms_input_data["precip_rate"]
+            for i in range(len(mrms_input_data.time)):
+                ax.contour(lons, lats, p.data[i, :, :], levels=levels, colors=f"C{i}", alpha=1.0, linewidths=1)
+
+
+
+        ax.coastlines()
+
+        return f
+

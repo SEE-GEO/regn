@@ -101,7 +101,7 @@ class L1CFile:
                 for a in input["S1"].attrs:
                     s = input["S1"].attrs[a].decode()
                     s = _RE_META_INFO.sub(f"NumberScansGranule={n_scans};", s)
-                    s = np.bytes(s)
+                    s = np.bytes_(s)
                     g.attrs[a] = s
 
                 g_st = g.create_group("ScanTime")
@@ -130,7 +130,7 @@ class L1CFile:
                 for a in input["S2"].attrs:
                     s = input["S2"].attrs[a].decode()
                     s = _RE_META_INFO.sub(f"NumberScansGranule={n_scans};", s)
-                    s = np.bytes(s)
+                    s = np.bytes_(s)
                     g.attrs[a] = s
 
                 g_st = g.create_group("ScanTime")
