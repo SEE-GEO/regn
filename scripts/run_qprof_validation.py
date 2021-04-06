@@ -39,7 +39,11 @@ normalizer = Normalizer.load("sftp://129.16.35.202/mnt/array1/share/MLDatasets/g
 
 def run_retrieval(f):
     stem = f.stem
-    input_data = InputData(f, normalizer, scans_per_batch=512)
+    qrnn = QRNN.load(model)
+    qrnn.quantile_axis = 1
+    qrnn.bin_axis = 1
+    normalizer = Normalizer.load("sftp://129.16.35.202/mnt/array1/share/MLDatasets/gprof/simple/gprof_gmi_normalizer.pckl")
+    input_data = InputData(f, normalizer, 256)
     results = input_data.run_retrieval(qrnn)
     output_file = input_data.write_retrieval_results(output_path, results)
     subprocess.run(["gzip", "-f", str(output_file)])
