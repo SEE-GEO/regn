@@ -98,10 +98,49 @@ class InputData(Dataset):
         for i in range(15):
             x[0, i] = torch.tensor(bts[:, :, i])
 
-        x = torch.nn.functional.pad(x, [p_n_l, p_n_r, p_m_l, p_m_r], "reflect")
+        x = torch.nn.functional.pad(x, [p_n_l, p_n_r, p_m_l, p_m_r], "replicate")
 
         return x
 
+    def run_retrieval_conv(self, qrnn):
+
+        m = 32 * int((self.n_scans / 32 + 0.5))
+        dm = m - self.n_scans
+        n = 32 * int((self.n_pixels / 32 + 0.5))
+        dn = n - self.n_pixels
+        p_m_l = dm // 2
+        p_m_r = dm - p_m_l
+        p_n_l = dn // 2
+        p_n_r = dn - p_n_l
+        bts = self.data["brightness_temperatures"].data.copy()
+        bts[bts < 0.0] = np.nan
+        bts[bts > 500.0] = np.nan
+        mask = np.isnan(bts[:, :, 10])
+        #bts[:, :, 9][mask] = np.nan
+        x = torch.zeros(1, 15, self.n_scans, self.n_pixels)
+        for i in range(15):
+            x[0, i] = torch.tensor(bts[:, :, i])
+        x = torch.nn.functional.pad(x, [p_n_l, p_n_r, p_m_l, p_m_r], "replicate")
+
+        with torch.no_grad():
+            y = torch.exp(qrnn.predict(x))
+            y_mean = qrnn.posterior_mean(y_pred=y)
+            y_quants = qrnn.posterior_quantiles(y_pred=y, quantiles=[0.333, 0.667])
+            pop = qrnn.probability_larger_than(y_pred=y, y=0.01)
+
+        y_mean = y_mean[0, p_m_l:-p_m_r, p_n_l:-p_n_l]
+        y_1st = y_quants[0, 0, p_m_l:-p_m_r, p_n_l:-p_n_l]
+        y_2nd = y_quants[0, 2, p_m_l:-p_m_r, p_n_l:-p_n_l]
+        pop = pop[0, p_m_l:-p_m_r, p_n_l:-p_n_l]
+
+        dims = ["scans", "pixels"]
+        data = {
+            "precip_mean": (dims[:2], y_mean),
+            "precip_1st_tertial": (dims[:2], y_1st),
+            "precip_3rd_tertial": (dims[:2], y_2nd),
+            "precip_pop": (dims[:2], pop)
+        }
+        return xarray.Dataset(data)
 
     def run_retrieval(self, qrnn):
 
