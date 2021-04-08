@@ -130,7 +130,7 @@ class InputData(Dataset):
 
         y_mean = y_mean[0, p_m_l:-p_m_r, p_n_l:-p_n_l]
         y_1st = y_quants[0, 0, p_m_l:-p_m_r, p_n_l:-p_n_l]
-        y_2nd = y_quants[0, 2, p_m_l:-p_m_r, p_n_l:-p_n_l]
+        y_2nd = y_quants[0, 1, p_m_l:-p_m_r, p_n_l:-p_n_l]
         pop = pop[0, p_m_l:-p_m_r, p_n_l:-p_n_l]
 
         dims = ["scans", "pixels"]
