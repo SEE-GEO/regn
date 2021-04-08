@@ -19,8 +19,8 @@ class L1CFile:
     """
     Basic functionality to read and write GPROF GMI L1C files.
     """
-    @staticmethod
-    def open_granule(granule, path, date=None):
+    @classmethod
+    def open_granule(cls, granule, path, date=None):
         """
         Find and open L1C file with a given granule number.
 
@@ -45,6 +45,8 @@ class L1CFile:
             f = next(iter(files))
             return L1CFile(f)
         except StopIteration:
+            if date is not None:
+                return cls.open_granule(granule, path, None)
             raise Exception(
                 f"Could not find a L1C file with granule number {granule}."
             )

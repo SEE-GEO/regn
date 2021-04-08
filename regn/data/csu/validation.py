@@ -250,9 +250,10 @@ def open_validation_dataset(granule_number, base_directory):
 
     rqi_files = [f for f in files if RQI_REGEX.match(f.name)]
     rqi_files = sorted(rqi_files, key=get_date)
-    rqi = np.zeros((len(times), n_rows, n_cols), dtype=np.int32)
+    rqi = np.zeros((len(times), n_rows, n_cols), dtype=np.float32)
     for i, f in enumerate(rqi_files):
-        rqi[i, :, :] = np.loadtxt(f, skiprows=6, dtype=np.int32)
+        rqi[i, :, :] = np.loadtxt(f, skiprows=6, dtype=np.float32)
+    rqi[rqi < 0.0] = np.nan
 
     mask_files = [f for f in files if MASK_REGEX.match(f.name)]
     mask_files = sorted(mask_files, key=get_date)
@@ -401,16 +402,20 @@ class FileProcessor:
 
 
                 if mrms_sub.time.size > 2:
-                    mrms_sub = mrms_sub.interp({"time": time})
+                    mrms_sub = mrms_sub.interp({"time": time}, method="nearest")
+                else:
+                    mrms_sub = mrms_sub[{"time": 0}]
 
                 precip_rate[i, j] = np.sum(
-                    weights * mrms_sub["precip_rate"].data[0]
-                )
-                radar_quality_index[i, j] = np.sum(
-                    weights * mrms_sub["radar_quality_index"].data[0]
+                    weights * mrms_sub["precip_rate"].data
                 )
 
-                mask = mrms_sub["mask"].data[0]
+                radar_quality_index[i, j] = np.sum(
+                    weights * mrms_sub["radar_quality_index"].data
+                )
+
+
+                mask = mrms_sub["mask"].data
                 rain_mask = (mask > 0).astype(np.float32)
                 rain_fraction[i, j] = np.sum(weights * rain_mask)
 
@@ -582,8 +587,7 @@ class FileProcessor:
                                / f"{date.year}" / f"{date.month:02}")
         matchup_output_path.mkdir(parents=True, exist_ok=True)
 
-        #roi = [-130, 20, -60.0, 55]
-        roi = [-110, 30, -100.0, 40]
+        roi = [-130, 20, -60.0, 55]
 
         _, l1c_file_sub = tempfile.mkstemp()
         try:
@@ -630,7 +634,10 @@ class FileProcessor:
             tasks.append(pool.submit(self.process_granule, g))
 
         for t in tqdm(tasks):
-            t.result()
+            try:
+                t.result()
+            except Exception as e:
+                print(f"Error during processing: {e}")
 
 def _get_date(filename):
     return datetime.strptime(filename.split(".")[4][:8], "%Y%m%d")
