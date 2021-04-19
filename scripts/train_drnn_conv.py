@@ -3,7 +3,8 @@ from pathlib import Path
 
 import numpy as np
 from regn.data.csu.training_data import GPROFConvDataset
-from regn.models.unet import UNet
+from quantnn.models.pytorch.resnet import ResNet
+from quantnn.models.pytorch.xception import XceptionFpn
 from quantnn import DRNN
 from quantnn.data import DataFolder
 from quantnn.normalizer import Normalizer
@@ -38,8 +39,8 @@ device = args.device[0]
 
 model_path.mkdir(parents=False, exist_ok=True)
 
-network_name = f"drnn_unet_bts_only.pt"
-results_name = f"drnn_unet_bts_only.dat"
+network_name = f"drnn_xception_8_256_bts_only.pt"
+results_name = f"drnn_xception_8_256_bts_only.dat"
 
 #
 # Load the data.
@@ -49,8 +50,8 @@ host = "129.16.35.202"
 dataset_factory = GPROFConvDataset
 
 normalizer = Normalizer.load("sftp://129.16.35.202/mnt/array1/share/MLDatasets/gprof/conv/normalizer_gprof_gmi_conv_bt_only.pckl")
-bins = np.logspace(-3, 2, 257)
-kwargs = {"batch_size": 512,
+bins = np.logspace(-4, 2.5, 257)
+kwargs = {"batch_size": 8,
           "normalizer": normalizer,
           "bins": bins}
 
@@ -62,10 +63,20 @@ validation_data = DataFolder(validation_path, dataset_factory, kwargs=kwargs, n_
 # Create model
 #
 
-model = UNet(15, bins.size - 1)
+model = XceptionFpn(15, bins.size - 1, n_features=256, blocks=8)
 drnn = DRNN(bins, model=model)
+#drnn = DRNN.load(model_path / network_name)
+model = drnn.model
+#for m in model.modules():
+#    m.eval()
+#model.head.train(False)
+#for p in model.parameters():
+#    p.requires_grad = False
+#for p in model.head.parameters():
+#    p.requires_grad = True
+#
 
-n_epochs=5
+n_epochs=40
 optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
 drnn.train(training_data=training_data,
@@ -76,9 +87,8 @@ drnn.train(training_data=training_data,
            device=device,
            mask=-1.0)
 drnn.save(model_path / network_name)
-
-n_epochs=10
-optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+n_epochs=40
+optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.0)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
 drnn.train(training_data=training_data,
            validation_data=validation_data,
@@ -88,9 +98,8 @@ drnn.train(training_data=training_data,
            device=device,
            mask=-1.0)
 drnn.save(model_path / network_name)
-
-n_epochs=20
-optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+n_epochs=40
+optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
 drnn.train(training_data=training_data,
            validation_data=validation_data,
@@ -100,8 +109,8 @@ drnn.train(training_data=training_data,
            device=device,
            mask=-1.0)
 drnn.save(model_path / network_name)
-n_epochs=20
-optimizer = optim.SGD(model.parameters(), lr=0.1)
+n_epochs=40
+optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.0)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
 drnn.train(training_data=training_data,
            validation_data=validation_data,

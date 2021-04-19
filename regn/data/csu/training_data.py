@@ -51,11 +51,9 @@ def write_preprocessor_file(input_file,
         indices = np.random.permutation(data.samples.size)[:n_samples]
     else:
         indices = slice(0, None)
-    print(indices)
     data = data[{"samples": indices}].rename(new_names)
     n_scans = data.samples.size // n_pixels
     n_scans += (data.samples.size % n_pixels) > 0
-    print(data.samples.size, n_scans, n_pixels)
 
     new_dims = ["scans", "pixels", "channels"]
     new_dataset = {
@@ -71,7 +69,6 @@ def write_preprocessor_file(input_file,
         s = shape[:n_dims + 1]
         new_data = np.zeros(s)
         n = da.data.size
-        print(n)
         new_data.ravel()[:n] = da.data.ravel()
         new_data.ravel()[n:] = np.nan
         new_dataset[k] = ((dims[:n_dims + 1]), new_data)
@@ -199,7 +196,7 @@ class GPROFDataset:
             invalid = (bts > 500.0) + (bts < 0.0)
             bts[invalid] = -1.0
 
-            LOGGER.info("Loaded %n brightness temperatures.", n)
+            LOGGER.info("Loaded %s brightness temperatures.", n)
 
             # 2m temperature
             t2m = variables["two_meter_temperature"][:].reshape(-1, 1)
@@ -240,7 +237,6 @@ class GPROFDataset:
         t2m = x[:, 15]
         tcwv = x[:, 16]
         st = np.where(x[:, 17:17+19])[1]
-        print(st.size)
         at = np.where(x[:, 17+19:17+23])[1]
 
         dataset = xr.open_dataset(self.filename)
@@ -665,7 +661,7 @@ class GPROFConvDataset:
                 if r > 0.5:
                     self.x[i] = np.flip(self.x[i], axis=1)
                     self.y[i] = np.flip(self.y[i], axis=0)
-        self.y[np.isnan(self.y)] = -1.0
+            self.y[np.isnan(self.y)] = -1.0
 
     def get_surface_types(self):
         """

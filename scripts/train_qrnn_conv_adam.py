@@ -1,3 +1,4 @@
+
 import argparse
 from pathlib import Path
 
@@ -32,18 +33,15 @@ parser.add_argument('validation_data_path',
 parser.add_argument('model_path', metavar='model_path', type=str, nargs=1,
                     help='Where to store the model.')
 parser.add_argument('--device', metavar='device', type=str, default="cuda", nargs=1)
-
 args = parser.parse_args()
 training_path = args.training_data_path[0]
 validation_path = args.validation_data_path[0]
 model_path = Path(args.model_path[0])
 device = args.device[0]
-print("device: ", device)
 
 model_path.mkdir(parents=False, exist_ok=True)
-
-network_name = f"qrnn_xception_8_256_only_log.pt"
-results_name = f"qrnn_xception_8_256_only_log.dat"
+network_name = f"qrnn_xception_8_256_only_log_adam_2.pt"
+results_name = f"qrnn_xception_8_256_only_log_adam_2.dat"
 
 #
 # Load the data.
@@ -66,40 +64,13 @@ validation_data = DataFolder(validation_path, dataset_factory, kwargs=kwargs, n_
 #
 
 quantiles = np.linspace(1e-3, 1.0 - 1e-3, 128)
-#model = XceptionFpn(15, quantiles.size, n_features=256, blocks=8)
-#qrnn = QRNN(quantiles, model=model)
-qrnn = QRNN.load(model_path / network_name)
+model = XceptionFpn(15, quantiles.size, n_features=256, blocks=8)
+qrnn = QRNN(quantiles, model=model)
 model = qrnn.model
 
-#qrnn = QRNN.load(model_path / network_name)
-#for m in qrnn.model.modules():
-#    m.training = False
-#qrnn.model.head.training = True
-#for p in qrnn.model.parameters():
-#    p.requires_grad = False
-#for p in qrnn.model.head.parameters():
-#        p.requires_grad = True
-#
-from tensorflow import keras
-from tensorflow.keras.optimizers import SGD
-from quantnn.models.keras import CosineAnnealing
-
-#n_epochs=40
-#optimizer = optim.SGD(qrnn.model.parameters(), lr=0.1, momentum=0.9)
-#scheduler = CosineAnnealingLR(optimizer, n_epochs, 0.001)
-###scheduler = ReduceLROnPlateau(optimizer, factor=0.5, patience=3)
-#qrnn.train(training_data=training_data,
-#           validation_data=validation_data,
-#           n_epochs=n_epochs,
-#           optimizer=optimizer,
-#           scheduler=scheduler,
-#           device=device,
-#           mask=-10.0)
-#qrnn.save(model_path / network_name)
-n_epochs=40
-optimizer = optim.SGD(qrnn.model.parameters(), lr=0.01, momentum=0.9)
-scheduler = CosineAnnealingLR(optimizer, n_epochs, 0.0001)
-#scheduler = ReduceLROnPlateau(optimizer, factor=0.5, patience=3)
+n_epochs=20
+optimizer = optim.Adam(qrnn.model.parameters(), lr=0.01)
+scheduler = CosineAnnealingLR(optimizer, 20)
 qrnn.train(training_data=training_data,
            validation_data=validation_data,
            n_epochs=n_epochs,
@@ -107,11 +78,29 @@ qrnn.train(training_data=training_data,
            scheduler=scheduler,
            device=device,
            mask=-10.0)
-qrnn.save(model_path / network_name)
-#
-
-n_epochs=40
-scheduler = CosineAnnealingLR(optimizer, n_epochs, 0.00001)
+n_epochs=20
+optimizer = optim.Adam(qrnn.model.parameters(), lr=0.01)
+scheduler = CosineAnnealingLR(optimizer, 20)
+qrnn.train(training_data=training_data,
+           validation_data=validation_data,
+           n_epochs=n_epochs,
+           optimizer=optimizer,
+           scheduler=scheduler,
+           device=device,
+           mask=-10.0)
+n_epochs=20
+optimizer = optim.Adam(qrnn.model.parameters(), lr=0.001)
+scheduler = CosineAnnealingLR(optimizer, 20)
+qrnn.train(training_data=training_data,
+           validation_data=validation_data,
+           n_epochs=n_epochs,
+           optimizer=optimizer,
+           scheduler=scheduler,
+           device=device,
+           mask=-10.0)
+n_epochs=20
+optimizer = optim.Adam(qrnn.model.parameters(), lr=0.001)
+scheduler = CosineAnnealingLR(optimizer, 20)
 qrnn.train(training_data=training_data,
            validation_data=validation_data,
            n_epochs=n_epochs,
@@ -120,33 +109,8 @@ qrnn.train(training_data=training_data,
            device=device,
            mask=-10.0)
 
-qrnn.save(model_path / network_name)
-n_epochs=40
-scheduler = CosineAnnealingLR(optimizer, n_epochs, 0.00001)
-qrnn.train(training_data=training_data,
-           validation_data=validation_data,
-           n_epochs=n_epochs,
-           optimizer=optimizer,
-           scheduler=scheduler,
-           device=device,
-           mask=-10.0)
 
 qrnn.save(model_path / network_name)
-#n_epochs=20
-#optimizer = optim.SGD(model.parameters(), lr=0.0010.9)
-##scheduler = ReduceLROnPlateau(optimizer, factor=0.5, patience=3)
-#qrnn.train(training_data=training_data,
-#           validation_data=validation_data,
-#           n_epochs=n_epochs,
-#           optimizer=optimizer,
-#           scheduler=scheduler,
-#           device=device,
-#           mask=-1.0)
-#qrnn.save(model_path / network_name)
-#
-#
-# Store results
-#
 
 qrnn.save(model_path / network_name)
 np.savetxt(results_name, np.stack((training_errors, validation_errors)))

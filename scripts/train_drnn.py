@@ -61,8 +61,8 @@ else:
 #
 
 host = "129.16.35.202"
-training_path = "/mnt/array1/share/MLDatasets/gprof/simple/training_data"
-validation_path = "/mnt/array1/share/MLDatasets/gprof/simple/validation_data"
+training_path = "/gdata/simon/gprof/gmi/simple/training_data"
+validation_path = "/gdata/simon/gprof/gmi/simple/validation_data"
 dataset_factory = GPROFDataset
 
 normalizer = Normalizer.load("sftp://129.16.35.202/mnt/array1/share/MLDatasets/gprof/simple/gprof_gmi_normalizer.pckl")
@@ -72,10 +72,8 @@ kwargs = {"batch_size": 512,
           "normalizer": normalizer,
           "bins": bins}
 
-path = "sftp://" + host + "/" + training_path
-training_data = DataFolder(path, dataset_factory, kwargs=kwargs, n_workers=5)
-path = "sftp://" + host + "/" + validation_path
-validation_data = DataFolder(path, dataset_factory, kwargs=kwargs, n_workers=1)
+training_data = DataFolder(training_path, dataset_factory, kwargs=kwargs, n_workers=5)
+validation_data = DataFolder(validation_path, dataset_factory, kwargs=kwargs, n_workers=1)
 #training_data = DataLoader(training_data, batch_size=None, num_workers=1, pin_memory=True)
 #validation_data = DataLoader(validation_data, batch_size=None, num_workers=1, pin_memory=True)
 

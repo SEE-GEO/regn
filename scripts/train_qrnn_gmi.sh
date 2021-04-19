@@ -13,6 +13,6 @@ export QUANTNN_LOG_LEVEL=INFO
 cd ${HOME}/src/regn/scripts
 source ${HOME}/src/regn/scripts/setup_vera.sh
 
-python train_qrnn.py  ${TRAINING_DATA} ${VALIDATION_DATA} ${MODEL_PATH} --n_neurons=512 --n_layers=4 --sensor=gmi --batch_norm
-python train_qrnn.py  ${TRAINING_DATA} ${VALIDATION_DATA} ${MODEL_PATH} --n_neurons=512 --n_layers=8 --sensor=gmi --batch_norm
+#python train_qrnn.py  ${TRAINING_DATA} ${VALIDATION_DATA} ${MODEL_PATH} --n_neurons=512 --n_layers=4 --sensor=gmi --batch_norm
+#python train_qrnn.py  ${TRAINING_DATA} ${VALIDATION_DATA} ${MODEL_PATH} --n_neurons=512 --n_layers=8 --sensor=gmi --batch_norm
 python train_qrnn.py  ${TRAINING_DATA} ${VALIDATION_DATA} ${MODEL_PATH} --n_neurons=512 --n_layers=12 --sensor=gmi --batch_norm

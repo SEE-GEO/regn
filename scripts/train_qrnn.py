@@ -7,6 +7,7 @@ from quantnn.models.pytorch.fully_connected import FullyConnected
 from quantnn import QRNN
 from quantnn.data import DataFolder
 from quantnn.normalizer import Normalizer
+from quantnn.models.pytorch.logging import TensorBoardLogger
 import torch
 from torch.utils.data import DataLoader
 from torch import nn
@@ -16,7 +17,8 @@ from torch import optim
 # Command line arguments.
 ###############################################################################
 
-parser = argparse.ArgumentParser(description='Train fully-connected QRNN')
+parser = argparse.ArgumentParser(
+        description='Training script for the GPROF-NN-0D algorithm.')
 parser.add_argument('training_data', metavar='training_data', type=str, nargs=1,
                     help='Path to training data.')
 parser.add_argument('validation_data', metavar='validation_data', type=str, nargs=1,
@@ -49,20 +51,15 @@ model_path.mkdir(parents=False, exist_ok=True)
 n_layers = args.n_layers[0]
 n_neurons = args.n_neurons[0]
 
-if skip_connections:
-    network_name = f"qrnn_{sensor}_{n_layers}_{n_neurons}_relu_sc.pt"
-    results_name = f"qrnn_{sensor}_{n_layers}_{n_neurons}_relu_sc.dat"
-else:
-    network_name = f"qrnn_{sensor}_{n_layers}_{n_neurons}_relu.pt"
-    results_name = f"qrnn_{sensor}_{n_layers}_{n_neurons}_relu.dat"
+network_name = f"gprof_nn_0d_{sensor}_{n_layers}_{n_neurons}.pt"
 
 #
 # Load the data.
 #
 
-host = "129.16.35.202"
-training_path = "/mnt/array1/share/MLDatasets/gprof/simple/training_data"
-validation_path = "/mnt/array1/share/MLDatasets/gprof/simple/validation_data"
+training_path = "/gdata/simon/gprof/gmi/simple/training_data"
+validation_path = "/gdata/simon/gprof/gmi/simple/validation_data"
+
 dataset_factory = GPROFDataset
 
 normalizer = Normalizer.load("sftp://129.16.35.202/mnt/array1/share/MLDatasets/gprof/simple/gprof_gmi_normalizer.pckl")
@@ -70,18 +67,14 @@ print(normalizer.means)
 kwargs = {"batch_size": 512,
           "normalizer": normalizer}
 
-path = "sftp://" + host + "/" + training_path
-training_data = DataFolder(path, dataset_factory, kwargs=kwargs, n_workers=5)
-path = "sftp://" + host + "/" + validation_path
-validation_data = DataFolder(path, dataset_factory, kwargs=kwargs, n_workers=1)
-#training_data = DataLoader(training_data, batch_size=None, num_workers=1, pin_memory=True)
-#validation_data = DataLoader(validation_data, batch_size=None, num_workers=1, pin_memory=True)
+training_data = DataFolder(training_path, dataset_factory, kwargs=kwargs, n_workers=5)
+validation_data = DataFolder(validation_path, dataset_factory, kwargs=kwargs, n_workers=1)
 
 #
 # Create model
 #
 
-quantiles = np.linspace(0.001, 0.999, 256)
+quantiles = np.linspace(0.001, 0.999, 128)
 model = FullyConnected(40,
                        quantiles.size,
                        n_layers,
@@ -90,52 +83,57 @@ model = FullyConnected(40,
                        batch_norm=batch_norm)
 qrnn = QRNN(quantiles, model=model)
 
-n_epochs=5
-optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
-scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
-qrnn.train(training_data=training_data,
-           validation_data=validation_data,
-           n_epochs=n_epochs,
-           optimizer=optimizer,
-           scheduler=scheduler,
-           device="gpu")
-qrnn.save(model_path / network_name)
 n_epochs=10
-optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+logger = TensorBoardLogger(n_epochs)
+logger.set_attributes({
+    "n_layers": n_layers,
+    "n_neurons": n_neurons
+    })
+
+
+optimizer = optim.Adam(model.parameters(), lr=0.01)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
 qrnn.train(training_data=training_data,
            validation_data=validation_data,
            n_epochs=n_epochs,
            optimizer=optimizer,
            scheduler=scheduler,
+           logger=logger,
            device="gpu")
 qrnn.save(model_path / network_name)
+
+n_epochs=10
+optimizer = optim.Adam(model.parameters(), lr=0.01)
+scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
+qrnn.train(training_data=training_data,
+           validation_data=validation_data,
+           n_epochs=n_epochs,
+           optimizer=optimizer,
+           scheduler=scheduler,
+           logger=logger,
+           device="gpu")
+qrnn.save(model_path / network_name)
+
 n_epochs=20
-optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
 qrnn.train(training_data=training_data,
            validation_data=validation_data,
            n_epochs=n_epochs,
            optimizer=optimizer,
            scheduler=scheduler,
+           logger=logger,
            device="gpu")
 qrnn.save(model_path / network_name)
+
 n_epochs=40
-optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
 scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs)
 qrnn.train(training_data=training_data,
            validation_data=validation_data,
            n_epochs=n_epochs,
            optimizer=optimizer,
            scheduler=scheduler,
+           logger=logger,
            device="gpu")
 qrnn.save(model_path / network_name)
-
-#
-# Store results
-#
-
-qrnn.save(model_path / network_name)
-training_errors = losses["training_errors"]
-validation_errors = losses["validation_errors"]
-np.savetxt(results_name, np.stack((training_errors, validation_errors)))
