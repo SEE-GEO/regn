@@ -1,6 +1,6 @@
 """
-Tests to test the extraction of training data from the GPROF
-retrieval database.
+Tests for the Pytorch dataset classes used to load the training
+data.
 """
 from pathlib import Path
 
@@ -11,7 +11,7 @@ import xarray as xr
 from quantnn.qrnn import QRNN
 from quantnn.models.pytorch.xception import XceptionFpn
 
-from regn.data.csu.training_data import (GPROFDataset,
+from regn.data.csu.training_data import (GPROF0DDataset,
                                          GPROFValidationDataset,
                                          GPROFConvDataset,
                                          GPROFConvValidationDataset,
@@ -19,14 +19,14 @@ from regn.data.csu.training_data import (GPROFDataset,
 from regn.data.csu.preprocessor import PreprocessorFile
 
 
-def test_gprof_dataset():
+def test_gprof_0d_dataset():
     """
     Ensure that iterating over single-pixel dataset conserves
     statistics.
     """
     path = Path(__file__).parent
-    input_file = path / "data" / "dataset_simple.nc"
-    dataset = GPROFDataset(input_file, batch_size=2)
+    input_file = path / "data" / "dataset_0d.nc"
+    dataset = GPROF0DDataset(input_file, batch_size=2)
 
     xs = []
     ys = []
@@ -47,25 +47,57 @@ def test_gprof_dataset():
     assert np.all(np.isclose(x_mean, x_mean_ref, atol=1e-6))
     assert np.all(np.isclose(y_mean, y_mean_ref, atol=1e-6))
 
+def test_gprof_0d_dataset_multi_target():
+    """
+    Ensure that iterating over single-pixel dataset conserves
+    statistics.
+    """
+    path = Path(__file__).parent
+    input_file = path / "data" / "dataset_0d.nc"
+    dataset = GPROF0DDataset(input_file,
+                             target=["surface_precip", "convective_precip"],
+                             batch_size=2)
+
+    xs = []
+    ys = {}
+
+    x_mean_ref = dataset.x.sum(axis=0)
+    y_mean_ref = {k: dataset.y[k].sum(axis=0) for k in dataset.y}
+
+    for x, y in dataset:
+        xs.append(x)
+        for k in y:
+            ys.setdefault(k, []).append(y[k])
+
+    xs = torch.cat(xs, dim=0)
+    ys = {k: torch.cat(ys[k], dim=0) for k in ys}
+
+    x_mean = xs.sum(dim=0).detach().numpy()
+    y_mean = {k: ys[k].sum(dim=0).detach().numpy() for k in ys}
+
+    assert np.all(np.isclose(x_mean, x_mean_ref, atol=1e-6))
+    for k in y_mean_ref:
+        assert np.all(np.isclose(y_mean[k], y_mean_ref[k], atol=1e-6))
+
 def test_save_data(tmp_path):
     """
     Ensure that storing data and loading it again yields the
     same training data.
     """
     path = Path(__file__).parent
-    input_file = path / "data" / "dataset_simple.nc"
-    dataset = GPROFDataset(input_file,
-                           batch_size=2,
-                           shuffle=False)
+    input_file = path / "data" / "dataset_0d.nc"
+    dataset = GPROF0DDataset(input_file,
+                             batch_size=2,
+                             shuffle=False)
 
     normalizer = dataset.normalizer
     output_path = tmp_path / "test.nc"
     dataset.save_data(output_path)
 
-    dataset2 = GPROFDataset(output_path,
-                            normalizer=normalizer,
-                            shuffle=False,
-                            batch_size=2)
+    dataset2 = GPROF0DDataset(output_path,
+                              normalizer=normalizer,
+                              shuffle=False,
+                              batch_size=2)
 
     print(dataset.x)
     print(dataset2.x)
@@ -80,7 +112,7 @@ def test_evaluate_simple():
     results.
     """
     path = Path(__file__).parent
-    input_file = path / "data" / "dataset_simple.nc"
+    input_file = path / "data" / "dataset_0d.nc"
     dataset = GPROFValidationDataset(input_file, batch_size=2)
     quantiles = np.linspace(0.01, 0.99, 99)
     qrnn = QRNN(quantiles, n_inputs=40)
@@ -100,8 +132,8 @@ def test_evaluate_gradients():
     results.
     """
     path = Path(__file__).parent
-    input_file = path / "data" / "dataset_simple.nc"
-    dataset = GPROFDataset(input_file, batch_size=2)
+    input_file = path / "data" / "dataset_0d.nc"
+    dataset = GPROF0DDataset(input_file, batch_size=2)
     quantiles = np.linspace(0.01, 0.99, 99)
     qrnn = QRNN(quantiles, n_inputs=40)
     results = dataset.evaluate_sensitivity(qrnn)
@@ -160,8 +192,12 @@ def test_evaluate_conv():
     assert "surface_type" in results
 
 def test_write_preprocessor_file(tmp_path):
+    """
+    Ensure that storing data as preprocessor file produces consistent
+    output.
+    """
     path = Path(__file__).parent
-    input_file = path / "data" / "dataset_simple.nc"
+    input_file = path / "data" / "dataset_0d.nc"
     output_file = tmp_path / "test.pp"
     write_preprocessor_file(input_file, output_file)
 

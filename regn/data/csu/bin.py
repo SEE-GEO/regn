@@ -159,7 +159,7 @@ class GPROFGMIBinFile:
         results["temperature"] = self.temperature * np.ones(1)
         return results
 
-def load_data(filename, start=0.0, end=1.0):
+def load_data(filename, start=0.0, end=1.0, include_profiles=False):
     """
     Wrapper function to load data from a file.
 
@@ -171,7 +171,7 @@ def load_data(filename, start=0.0, end=1.0):
     Returns:
         Dictionary containing each database variables as numpy array.
     """
-    input_file = GPROFGMIBinFile(filename)
+    input_file = GPROFGMIBinFile(filename, include_profiles=include_profiles)
     return input_file.load_data(start, end)
 
 ###############################################################################
@@ -197,7 +197,7 @@ class GPROFGMIOutputFile:
         """
         Create a new output file with the given name.
         """
-        print("Createin output file: ", filename)
+        print("Creating output file: ", filename)
         self.filename = filename
         Dataset(filename, "w").close()
         manager = multiprocessing.Manager()

@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from regn.data.csu.bin import (FileProcessor,
                                GPROFGMIBinFile)
-from regn.data.csu.training_data import GPROFDataset
+from regn.data.csu.training_data import GPROF0DDataset
 from regn.data.csu.retrieval import (ORBIT_HEADER_TYPES,
                                      PROFILE_INFO_TYPES,
                                      SCAN_HEADER_TYPES,
@@ -27,7 +27,7 @@ def test_file_processor(tmp_path):
 
     input_file = GPROFGMIBinFile(path / "data" / "gpm_300_40_00_18.bin")
 
-    dataset = GPROFDataset(output_file, normalize=False)
+    dataset = GPROF0DDataset(output_file, normalize=False)
     normalizer = dataset.normalizer
 
     bts_input = input_file.handle["brightness_temps"].view("15f4")[:, :3]

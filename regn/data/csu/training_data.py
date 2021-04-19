@@ -23,6 +23,10 @@ from regn.data.augmentation import extract_subscene, mask_stripe
 from regn.data.csu.preprocessor import PreprocessorFile
 
 LOGGER = logging.getLogger(__name__)
+_DEVICE = torch.device("cpu")
+if torch.cuda.is_available():
+    _DEVICE = torch.device("cuda")
+
 
 
 def write_preprocessor_file(input_file,
@@ -92,11 +96,11 @@ def write_preprocessor_file(input_file,
 ###############################################################################
 # Single-pixel observations.
 ###############################################################################
-class GPROFDataset:
+class GPROF0DDataset:
     """
     Dataset class providing an interface for the single-pixel GPROF
     training dataset mapping TBs and ancillary data to surface precip
-    values.
+    values and other target variables.
 
     Attributes:
         x: Rank-2 tensor containing the input data with
@@ -114,22 +118,26 @@ class GPROFDataset:
         filename,
         target="surface_precip",
         normalize=True,
-        transform_zero_rain=True,
+        transform_zeros=True,
         batch_size=None,
         normalizer=None,
         shuffle=True,
         bins=None,
     ):
         """
-        Create GPROF dataset.
+        Create GPROF 0D dataset.
 
         Args:
             filename: Path to the NetCDF file containing the data to
-                 load.
+                 0D training data toload.
             target: The variable to use as target (output) variable.
             normalize: Whether or not to normalize the input data.
-            transform_zero_rain: Whether or not to replace very small
+            transform_zeros: Whether or not to replace very small
                  and zero rain with random amounts in the range [1e-6, 1e-4]
+            batch_size: Number of samples in each training batch.
+            shuffle: Whether or not to shuffle the training data.
+            bins: If given, used to transform the training data to categorical
+                 variables by binning using the bin boundaries in ``bins``.
         """
         self.filename = filename
         self.target = target
@@ -149,11 +157,14 @@ class GPROFDataset:
         if normalize:
             self.x = self.normalizer(self.x)
 
-        if transform_zero_rain:
-            self._transform_zero_rain()
+        if transform_zeros:
+            self._transform_zeros()
 
         self.x = self.x.astype(np.float32)
-        self.y = self.y.astype(np.float32)
+        if isinstance(self.y, dict):
+            self.y = {k: self.y[k].astype(np.float32) for k in self.y}
+        else:
+            self.y = self.y.astype(np.float32)
 
         if bins is not None:
             self.binned = True
@@ -165,13 +176,31 @@ class GPROFDataset:
         if self.shuffle:
             self._shuffle()
 
-    def _transform_zero_rain(self):
+    def _transform_zeros(self):
         """
-        Transforms rain amounts smaller than 1e-4 to a random amount withing
-        the range [1e-6, 1e-4], which helps to stabilize training of QRNNs.
+        Transforms target values that are zero to small, non-zero values.
         """
-        indices = self.y < 1e-4
-        self.y[indices] = np.random.uniform(1e-6, 1.0e-4, indices.sum())
+        if isinstance(self.y, dict):
+            for k, y_k in self.y.items():
+                if np.any([y_k > 0.0]):
+                    non_zero = np.min(y_k[y_k > 0.0], initial=0.0)
+                else:
+                    non_zero = 0.0
+                indices = (y_k < non_zero) * (y_k >= 0.0)
+                y_k[indices] = np.random.uniform(non_zero * 0.1,
+                                                 non_zero,
+                                                 indices.sum())
+        else:
+            y = self.y
+            if np.any(y > 0.0):
+                non_zero = np.min(y[y > 0.0], initial=0.0)
+            else:
+                non_zero = 0.0
+            indices = (y < non_zero) * (y >= 0.0)
+            y[indices] = np.random.uniform(non_zero * 0.1,
+                                           non_zero,
+                                           indices.sum())
+
 
     def _load_data(self):
         """
@@ -225,7 +254,12 @@ class GPROFDataset:
             # Output data
             #
 
-            self.y = variables[self.target][:]
+            if isinstance(self.target, list):
+                self.y = {l: variables[l][:] for l in self.target}
+            else:
+                self.y = variables[self.target][:]
+
+            LOGGER.info("Loaded %s samples from %s", self.x.shape[0], self.filename)
 
     def save_data(self, filename):
         if self.normalize:
@@ -264,10 +298,14 @@ class GPROFDataset:
 
 
     def _shuffle(self):
+        LOGGER.info("Shuffling dataset %s.", self.filename)
         if not self._shuffled:
             indices = np.random.permutation(self.x.shape[0])
             self.x = self.x[indices, :]
-            self.y = self.y[indices]
+            if isinstance(self.y, dict):
+                self.y = {k: self.y[k][indices] for k in self.y}
+            else:
+                self.y = self.y[indices]
             self._shuffled = True
 
     def __getitem__(self, i):
@@ -280,21 +318,23 @@ class GPROFDataset:
         """
         if i >= len(self):
             raise IndexError()
+        if i == 0:
+            self._shuffle()
 
         self._shuffled = False
         if self.batch_size is None:
-            return (torch.tensor(self.x[[i], :]), torch.tensor(self.y[[i]]))
+            if self.isinstance(self.y, dict):
+                return (torch.tensor(self.x[[i], :]),
+                        {k: torch.tensor(self.y[k][[i]]) for k in self.y})
 
         i_start = self.batch_size * i
         i_end = self.batch_size * (i + 1)
 
         x = torch.tensor(self.x[i_start:i_end, :])
-        y = torch.tensor(self.y[i_start:i_end])
-
-        if i + 1 == len(self):
-            self._shuffle()
-            if not self.binned:
-                self._transform_zero_rain()
+        if isinstance(self.y, dict):
+            y = {k: torch.tensor(self.y[k][i_start:i_end]) for k in self.y}
+        else:
+            y = torch.tensor(self.y[i_start:i_end])
 
         return x, y
 
@@ -308,7 +348,7 @@ class GPROFDataset:
         else:
             return self.x.shape[0]
 
-    def evaluate(self, model, batch_size=16384, device=torch.device("cuda")):
+    def evaluate(self, model, batch_size=16384, device=_DEVICE):
         """
         Run retrieval on test dataset and returns results as
         xarray Dataset.
@@ -394,7 +434,7 @@ class GPROFDataset:
         }
         return xr.Dataset(data)
 
-    def evaluate_sensitivity(self, model, batch_size=512, device=torch.device("cuda")):
+    def evaluate_sensitivity(self, model, batch_size=512, device=_DEVICE):
         """
         Run retrieval on dataset.
         """
@@ -467,7 +507,7 @@ class GPROFDataset:
         }
         return xr.Dataset(data)
 
-class GPROFValidationDataset(GPROFDataset):
+class GPROFValidationDataset(GPROF0DDataset):
     """
     Specialization of the GPROF single-pixel dataset to be used for
     validation. This class will neither shuffle the data nor replace
@@ -492,7 +532,7 @@ class GPROFValidationDataset(GPROFDataset):
         super().__init__(filename,
                          target=target,
                          normalize=normalize,
-                         transform_zero_rain=False,
+                         transform_zeros=False,
                          batch_size=batch_size,
                          normalizer=normalizer,
                          shuffle=False,
@@ -524,7 +564,7 @@ class GPROFConvDataset:
         filename,
         target="surface_precip",
         normalize=True,
-        transform_zero_rain=True,
+        transform_zeros=True,
         transform_log=False,
         batch_size=None,
         normalizer=None,
@@ -540,7 +580,7 @@ class GPROFConvDataset:
                  load.
             target: The variable to use as target (output) variable.
             normalize: Whether or not to normalize the input data.
-            transform_zero_rain: Whether or not to replace very small
+            transform_zeros: Whether or not to replace very small
                  and zero rain with random amounts in the range [1e-6, 1e-4]
         """
         self.filename = filename
@@ -561,14 +601,17 @@ class GPROFConvDataset:
         if normalize:
             self.x = self.normalizer(self.x)
 
-        if transform_zero_rain:
-            self._transform_zero_rain()
+        if transform_zeros:
+            self._transform_zeros()
 
         if transform_log:
             self._transform_log()
 
         self.x = self.x.astype(np.float32)
-        self.y = self.y.astype(np.float32)
+        if isinstance(self.y, dict):
+            self.y = {k: self.y[k].astype(np.float32) for k in self.y}
+        else:
+            self.y = self.y.astype(np.float32)
 
         if bins is not None:
             self.binned = True
@@ -580,13 +623,30 @@ class GPROFConvDataset:
         if self.shuffle:
             self._shuffle()
 
-    def _transform_zero_rain(self):
+    def _transform_zeros(self):
         """
-        Transforms rain amounts smaller than 1e-4 to a random amount withing
-        the range [1e-6, 1e-4], which helps to stabilize training of QRNNs.
+        Transforms target values that are zero to small, non-zero values.
         """
-        indices = (self.y < 1e-4) * (self.y >= 0.0)
-        self.y[indices] = np.random.uniform(1e-6, 1.0e-4, indices.sum())
+        if isinstance(self.y, dict):
+            for k, y_k in self.y.items():
+                if np.any(y_k > 0.0):
+                    non_zero = np.min(y_k[y_k > 0.0], initial=0.0)
+                else:
+                    non_zero = 0.0
+                indices = (y_k < non_zero) * (y_k >= 0.0)
+                y_k[indices] = np.random.uniform(non_zero * 0.1,
+                                                 non_zero,
+                                                 indices.sum())
+        else:
+            y = self.y
+            if np.any(y > 0.0):
+                non_zero = np.min(y[y > 0.0], initial=0.0)
+            else:
+                non_zero = 0.0
+            indices = (y < non_zero) * (y >= 0.0)
+            y[indices] = np.random.uniform(non_zero * 0.1,
+                                           non_zero,
+                                           indices.sum())
 
     def _transform_log(self):
         indices = self.y < 0.0
@@ -728,7 +788,7 @@ class GPROFConvDataset:
         if i + 1 == len(self):
             self._shuffle()
             if not self.binned:
-                self._transform_zero_rain()
+                self._transform_zeros()
 
         if i >= len(self):
             raise IndexError()
@@ -749,7 +809,7 @@ class GPROFConvDataset:
         model,
         surface_types,
         batch_size=128,
-        device=torch.device("cuda"),
+        device=_DEVICE,
         log=False,
     ):
         """
@@ -866,7 +926,7 @@ class GPROFConvValidationDataset(GPROFConvDataset):
         super().__init__(filename,
                          target=target,
                          normalize=normalize,
-                         transform_zero_rain=False,
+                         transform_zeros=False,
                          batch_size=batch_size,
                          normalizer=normalizer,
                          shuffle=False,
@@ -876,7 +936,7 @@ class GPROFConvValidationDataset(GPROFConvDataset):
         self,
         model,
         batch_size=32,
-        device=torch.device("cuda"),
+        device=_DEVICE,
         log=False,
     ):
         """
