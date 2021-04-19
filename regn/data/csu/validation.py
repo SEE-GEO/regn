@@ -5,6 +5,7 @@ regn.data.validation
 
 This module provides class to read in the MRMS validation data for GPM.
 """
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timedelta
 import os
 from pathlib import Path
@@ -15,15 +16,25 @@ import subprocess
 import numpy as np
 from pykdtree.kdtree import KDTree
 from pyproj import Transformer
+from tqdm import tqdm
 import xarray as xr
 
 from regn.data.csu.l1c import L1CFile
+from regn.data.csu.retrieval import RetrievalFile
 
 
-PRECIPRATE_REGEX = re.compile("PRECIPRATE\.GC\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz")
-MASK_REGEX = re.compile("MASK\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz")
-RQI_REGEX = re.compile("RQI\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz")
-FILE_REGEX = re.compile("[\w*\.]*\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz")
+PRECIPRATE_REGEX = re.compile(
+    r"PRECIPRATE\.GC\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz"
+)
+MASK_REGEX = re.compile(
+    r"MASK\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz"
+)
+RQI_REGEX = re.compile(
+    r"RQI\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz"
+)
+FILE_REGEX = re.compile(
+    r"[\w*\.]*\.(\d{8})\.(\d{6})\.(\d{5})\.\w*\.gz"
+)
 
 def local_east(xyz):
     """
@@ -239,9 +250,10 @@ def open_validation_dataset(granule_number, base_directory):
 
     rqi_files = [f for f in files if RQI_REGEX.match(f.name)]
     rqi_files = sorted(rqi_files, key=get_date)
-    rqi = np.zeros((len(times), n_rows, n_cols), dtype=np.int32)
+    rqi = np.zeros((len(times), n_rows, n_cols), dtype=np.float32)
     for i, f in enumerate(rqi_files):
-        rqi[i, :, :] = np.loadtxt(f, skiprows=6, dtype=np.int32)
+        rqi[i, :, :] = np.loadtxt(f, skiprows=6, dtype=np.float32)
+    rqi[rqi < 0.0] = np.nan
 
     mask_files = [f for f in files if MASK_REGEX.match(f.name)]
     mask_files = sorted(mask_files, key=get_date)
@@ -259,56 +271,14 @@ def open_validation_dataset(granule_number, base_directory):
         "radar_quality_index": (dims, rqi)
     }
 
-    return xr.Dataset(data)
+    return xr.Dataset(data).sortby(["time"])
 
 
 _WGS84_TO_ECEF = Transformer.from_crs("epsg:4326", "epsg:4978")
 _ECEF_TO_WGS84 = Transformer.from_crs("epsg:4978", "epsg:4326")
-_KD_TREE = None
-
-def find_closest_mrms_pixel(lat, lon, mrms_data):
-    """
-    Finds the coordinates of the MRMS pixel that is closest to
-    a given point.
-
-    Args:
-        lat: The latitude position of the point.
-        lon: The longitude position of the point.
-        mrms_data: Dataset containing the MRMS data.
-
-    Return:
-        Tuple ``(ri, ci)`` containing the row index ``ri`` and column index
-        ``ci`` of the closes pixel in the MRMS grid or ``None`` if the closest
-        point is more than 5000m away.
-    """
-    global _KD_TREE
-
-    if _KD_TREE is None:
-        lons = mrms_data["longitude"]
-        lats = mrms_data["latitude"]
-        lons, lats = np.meshgrid(lons, lats)
-
-        xyz = np.stack(_WGS84_TO_ECEF.transform(lats,
-                                                lons,
-                                                np.zeros_like(lats)), axis=-1)
-        xyz = xyz.reshape(-1, 3)
-        _KD_TREE = KDTree(xyz)
-
-    xyz = np.stack(_WGS84_TO_ECEF.transform(lat, lon, 0), axis=-1)
-    dist, idx = _KD_TREE.query(xyz.reshape(1, -1))
-
-    print(mrms_data["latitude"])
-    print(mrms_data["longitude"])
-    if dist > 5e3:
-        return None
-
-    NX = mrms_data.longitude.size
-    row_index = idx[0] // NX
-    column_index = idx[0] % NX
-    return row_index, column_index
 
 def run_preprocessor(l1c_file,
-                      output_file):
+                     output_file):
     """
     Run preprocessor on L1C GMI file.
 
@@ -317,12 +287,12 @@ def run_preprocessor(l1c_file,
              using the preprocessor.
     """
     output_file = Path(output_file)
-    if not output_file.exists():
-        jobid = str(os.getpid()) + "_pp"
-        prodtype = "CLIMATOLOGY"
-        prepdir = "/qdata2/archive/ERA5"
-        ancdir = "/qdata1/pbrown/gpm/ancillary"
-        ingestdir = "/qdata1/pbrown/gpm/ppingest"
+    jobid = str(os.getpid()) + "_pp"
+    prodtype = "CLIMATOLOGY"
+    prepdir = "/qdata2/archive/ERA5/"
+    ancdir = "/qdata1/pbrown/gpm/ppancillary/"
+    ingestdir = "/qdata1/pbrown/gpm/ppingest/"
+    try:
         subprocess.run(["gprof2020pp_GMI_L1C",
                         jobid,
                         prodtype, str(l1c_file),
@@ -330,12 +300,23 @@ def run_preprocessor(l1c_file,
                         ancdir,
                         ingestdir,
                         str(output_file)])
+    except Exception as e:
+        print("Running the preprocessor failed whith the following"
+              f"exception: {e}")
 
 
 class FileProcessor:
     """
     Processor class to match GPM GMI observations with MRMS validation data and
     extract validation data.
+
+    .. note ::
+
+        The FileProcessor object caches the KDTree used to find the nearest
+        MRMS pixel which means that one and the same object can only be used
+        to process data from the same MRMS spatial grid. This, however, should
+        not be an issue in practice because the grid is expected to be
+        constant.
     """
     def __init__(self,
                  validation_data_path,
@@ -345,6 +326,7 @@ class FileProcessor:
         self.l1c_data_path = Path(l1c_data_path)
         self.output_path = Path(output_path)
         self.granules = list_overpasses(validation_data_path)
+        self._kd_tree = None
 
     def match_granule(self,
                       granule_number,
@@ -355,6 +337,7 @@ class FileProcessor:
 
         lats = l1c_data["latitude"]
         lons = l1c_data["longitude"]
+
 
         precip_rate = np.zeros(lats.shape)
         rain_fraction = np.zeros(lats.shape)
@@ -388,8 +371,7 @@ class FileProcessor:
             for j in range(n_pixels):
                 lon = lons[i, j]
                 lat = lats[i, j]
-                print(lon, lat)
-                coords = find_closest_mrms_pixel(lat, lon, mrms_data)
+                coords = self.find_closest_mrms_pixel(lat, lon, mrms_data)
                 if coords is None:
                     precip_rate[i, j] = np.nan
                     continue
@@ -418,40 +400,44 @@ class FileProcessor:
                     "longitude": slice(ci - DX, ci + DX + 1),
                 }]
 
+
                 if mrms_sub.time.size > 2:
-                    mrms_sub = mrms_sub.interp({"time": time})[0]
+                    mrms_sub = mrms_sub.interp({"time": time}, method="nearest")
                 else:
                     mrms_sub = mrms_sub[{"time": 0}]
 
                 precip_rate[i, j] = np.sum(
                     weights * mrms_sub["precip_rate"].data
                 )
+
                 radar_quality_index[i, j] = np.sum(
                     weights * mrms_sub["radar_quality_index"].data
                 )
 
-                rain_mask = (mrms_sub["mask"] > 0).data.astype(np.float32)
+
+                mask = mrms_sub["mask"].data
+                rain_mask = (mask > 0).astype(np.float32)
                 rain_fraction[i, j] = np.sum(weights * rain_mask)
 
-                warm_strat_mask = mrms_sub["mask"].isin([1, 2]).data.astype(np.float32)
+                warm_strat_mask = np.isin(mask, [1, 2]).astype(np.float32)
                 warm_strat_fraction[i, j] = np.sum(weights * warm_strat_mask)
 
-                cold_strat_mask = mrms_sub["mask"].isin([10]).data.astype(np.float32)
+                cold_strat_mask = np.isin(mask, [10]).astype(np.float32)
                 cold_strat_fraction[i, j] = np.sum(weights * cold_strat_mask)
 
-                snow_mask = mrms_sub["mask"].isin([3, 4]).data.astype(np.float32)
+                snow_mask = np.isin(mask, [3, 4]).astype(np.float32)
                 snow_fraction[i, j] = np.sum(weights * snow_mask)
 
-                conv_mask = mrms_sub["mask"].isin([6.0]).data.astype(np.float32)
+                conv_mask = np.isin(mask, [6.0]).astype(np.float32)
                 conv_fraction[i, j] = np.sum(weights * conv_mask)
 
-                hail_mask = mrms_sub["mask"].isin([7.0]).data.astype(np.float32)
+                hail_mask = np.isin(mask, [7.0]).astype(np.float32)
                 hail_fraction[i, j] = np.sum(weights * hail_mask)
 
-                trop_strat_mask = mrms_sub["mask"].isin([91.0]).data.astype(np.float32)
+                trop_strat_mask = np.isin(mask, [91.0]).astype(np.float32)
                 tropical_strat_fraction[i, j] = np.sum(weights * trop_strat_mask)
 
-                trop_conv_mask = mrms_sub["mask"].isin([96.0]).data.astype(np.float32)
+                trop_conv_mask = np.isin(mask, [96.0]).astype(np.float32)
                 tropical_conv_fraction[i, j] = np.sum(weights * trop_conv_mask)
 
         match_data = {}
@@ -461,7 +447,7 @@ class FileProcessor:
         )
         match_data["longitude"] = (
             ("scans", "pixels"),
-            l1c_data["latitude"].data
+            l1c_data["longitude"].data
         )
         match_data["scan_time"] = (
             ("scans",),
@@ -476,7 +462,7 @@ class FileProcessor:
         )
         match_data["radar_quality_index"] = (
             ("scans", "pixels"),
-            precip_rate,
+            radar_quality_index,
             {"description":
              "Footprint-averaged radar quality index."
             }
@@ -547,6 +533,44 @@ class FileProcessor:
         )
         return xr.Dataset(match_data)
 
+    def find_closest_mrms_pixel(self, lat, lon, mrms_data):
+        """
+        Finds the coordinates of the MRMS pixel that is closest to
+        a given point.
+
+        Args:
+            lat: The latitude position of the point.
+            lon: The longitude position of the point.
+            mrms_data: Dataset containing the MRMS data.
+
+        Return:
+            Tuple ``(ri, ci)`` containing the row index ``ri`` and column index
+            ``ci`` of the closes pixel in the MRMS grid or ``None`` if the closest
+            point is more than 5000m away.
+        """
+
+        if self._kd_tree is None:
+            lons = mrms_data["longitude"]
+            lats = mrms_data["latitude"]
+            lons, lats = np.meshgrid(lons, lats)
+
+            xyz = np.stack(_WGS84_TO_ECEF.transform(lats,
+                                                    lons,
+                                                    np.zeros_like(lats)), axis=-1)
+            xyz = xyz.reshape(-1, 3)
+            self._kd_tree = KDTree(xyz)
+
+        xyz = np.stack(_WGS84_TO_ECEF.transform(lat, lon, 0), axis=-1)
+        dist, idx = self._kd_tree.query(xyz.reshape(1, -1), 1)
+
+        if dist > 5e3:
+            return None
+
+        NX = mrms_data.longitude.size
+        row_index = idx[0] // NX
+        column_index = idx[0] % NX
+        return row_index, column_index
+
     def process_granule(self,
                         granule_number):
         if granule_number not in self.granules:
@@ -557,13 +581,14 @@ class FileProcessor:
 
         date = self.granules[granule_number]
         preprocessor_output_path = (self.output_path / "preprocessor"
-                                    / f"{date.year}" / f"date.month")
+                                    / f"{date.year}" / f"{date.month:02}")
         preprocessor_output_path.mkdir(parents=True, exist_ok=True)
         matchup_output_path = (self.output_path / "match_ups"
-                               / f"{date.year}" / f"date.month")
+                               / f"{date.year}" / f"{date.month:02}")
         matchup_output_path.mkdir(parents=True, exist_ok=True)
 
-        roi = [-130, 20, 60.0, 55]
+        roi = [-130, 20, -60.0, 55]
+
         _, l1c_file_sub = tempfile.mkstemp()
         try:
             # Extract scans over CONUS
@@ -575,38 +600,328 @@ class FileProcessor:
             # Run preprocessor
             preprocessor_output = (preprocessor_output_path /
                                    (Path(l1c_file.filename).stem + ".pp"))
-            run_preprocessor(l1c_file_sub, preprocessor_output)
+            #run_preprocessor(l1c_file_sub, preprocessor_output)
 
             # Process granule
             matchup_output = (matchup_output_path /
-                              Path(l1c_file.filename).stem + ".nc")
+                              (str(Path(l1c_file.filename).stem) + ".nc"))
             l1c_data = L1CFile(l1c_file_sub).open()
             match_up = self.match_granule(granule_number, l1c_data)
             match_up.to_netcdf(matchup_output)
         finally:
             Path(l1c_file_sub).unlink()
 
-    def process_month(self, year, month):
-        # 1. Find granules
+    def process_month(self,
+                      year,
+                      month,
+                      n_workers=4):
+        """
+        Parallel processing of match ups for a given month.
+
+        Args:
+            year: The year the month of which to process
+                as integer.
+            month: The month to process as integer
+            n_workers: The number of processes to use for
+                 parallelization.
+        """
         granules = [g for (g, d) in self.granules.items() if
                     d.year == year and d.month == month]
 
-        # 2. Run preprocessor, store output
+        pool = ProcessPoolExecutor(max_workers=n_workers)
+        tasks = []
+        for g in granules:
+            tasks.append(pool.submit(self.process_granule, g))
 
-        # 3. Match observations, store output
+        for t in tqdm(tasks):
+            try:
+                t.result()
+            except Exception as e:
+                print(f"Error during processing: {e}")
+
+def _get_date(filename):
+    return datetime.strptime(filename.split(".")[4][:8], "%Y%m%d")
+
+def _get_granule_number(filename):
+    return int(filename.split(".")[5])
+
+class ResultProcessor:
+    """
+    Processor class to extract retrieval results from different retrievals
+    and combine them into a single file for each month.
+    """
+    def __init__(self,
+                 match_up_path,
+                 gprof_path,
+                 qprof_path,
+                 qprof_conv_path=None):
+        self.match_up_path = Path(match_up_path)
+        self.gprof_path = Path(gprof_path)
+        self.qprof_path = Path(qprof_path)
+
+        if qprof_conv_path is None:
+            self.qprof_conv_path = None
+        else:
+            self.qprof_conv_path = Path(qprof_conv_path)
+
+        self._find_files()
+
+
+    def _find_files(self):
+
+        validation_files = {}
+
+        files = self.match_up_path.glob("**/*.nc")
+        for f in files:
+            granule_number = _get_granule_number(f.name)
+            d = validation_files.setdefault(granule_number, {})
+            d["date"] = _get_date(f.name)
+            d["match_up_file"] = f
+
+        self.match_up_files = {f: _get_date(f.name) for f in files}
+
+        files = self.gprof_path.glob("**/*.BIN.gz")
+        for f in files:
+            granule_number = _get_granule_number(f.name)
+            d = validation_files.setdefault(granule_number, {})
+            d["gprof_file"] = f
+        self.gprof_files = {f: _get_date(f.name) for f in files}
+
+        files = self.qprof_path.glob("**/*.BIN.gz")
+        for f in files:
+            granule_number = _get_granule_number(f.name)
+            d = validation_files.setdefault(granule_number, {})
+            d["qprof_file"] = f
+        self.qprof_files = {f: _get_date(f.name) for f in files}
+
+        self.validation_files = validation_files
+
+    def process_month(self,
+                      year,
+                      month,
+                      output_path):
+        files = {gn: fs for gn, fs in self.validation_files.items()
+                 if fs["date"].year == year
+                 and fs["date"].month == month}
+
+        parts = []
+
+        for gn, fs in files.items():
+            match_up_file = fs["match_up_file"]
+            gprof_file = fs["gprof_file"]
+            qprof_file = fs["qprof_file"]
+
+            match_up_data = xr.load_dataset(match_up_file)
+            gprof_data = RetrievalFile(gprof_file, has_sensitivity=True).to_xarray_dataset()
+            qprof_data = RetrievalFile(qprof_file).to_xarray_dataset()
+
+            match_up_data = match_up_data.stack(samples=("scans", "pixels"))
+            gprof_data = gprof_data.stack(samples=("scans", "pixels"))
+            qprof_data = qprof_data.stack(samples=("scans", "pixels"))
+
+            valid = np.isfinite(match_up_data["surface_precipitation"])
+            valid *= gprof_data["surface_precip"] >= 0.0
+
+            match_up_data = match_up_data.isel(samples=valid).rename(
+                {"surface_precipitation": "surface_precip_mrms"}
+            )
+            gprof_data = gprof_data.isel(samples=valid)
+            gprof_data = gprof_data[["surface_precip"]].rename(
+                {"surface_precip": "surface_precip_gprof"}
+            )
+            qprof_data = qprof_data.isel(samples=valid)
+            qprof_data = qprof_data[["surface_precip"]].rename(
+                {"surface_precip": "surface_precip_qprof"}
+            )
+            merged = xr.merge([match_up_data, gprof_data, qprof_data])
+            parts.append(merged.reset_index("samples"))
+
+        results = xr.concat(parts, dim="samples")
+
+        output_path = Path(output_path)
+        if output_path.is_dir():
+            output_path = output_path = f"validation_results_{year}_{month:02}.nc"
+        results.to_netcdf(output_path)
+
+    def plot_granule(self,
+                     granule,
+                     mark_fns=False):
+        import matplotlib.pyplot as plt
+        import cartopy.crs as ccrs
+        from matplotlib.colors import LogNorm, Normalize
+        from matplotlib.gridspec import GridSpec
+
+        try:
+            fs = self.validation_files[granule]
+        except KeyError:
+            raise Exception(f"No validation data available for granule {granule}.")
+
+        match_up_file = fs["match_up_file"]
+        gprof_file = fs["gprof_file"]
+        qprof_file = fs["qprof_file"]
+
+        mrms_data = xr.load_dataset(match_up_file)
+        gprof_data = RetrievalFile(gprof_file, has_sensitivity=True).to_xarray_dataset()
+        qprof_data = RetrievalFile(qprof_file).to_xarray_dataset()
+
+        gs = GridSpec(2, 2)
+        f = plt.figure(figsize=(15, 15))
+
+        rain_norm = LogNorm(1e-2, 1e2)
+        lats = mrms_data["latitude"]
+        lons = mrms_data["longitude"]
+        valid = gprof_data["surface_precip"] >= 0.0
+
+        rqi = mrms_data["radar_quality_index"]
+        ax = plt.subplot(gs[0, 0], projection=ccrs.PlateCarree())
+        ax.plot(lons[:, 0], lats[:, 0], ls="--", c="grey")
+        ax.plot(lons[:, -1], lats[:, -1], ls="--", c="grey")
+        ax.pcolormesh(lons, lats, rqi, norm=Normalize(0, 1))
+        ax.coastlines()
+
+        p_mrms = mrms_data["surface_precipitation"]
+        p = mrms_data["surface_precipitation"]
+        p = np.maximum(p, 1e-3)
+        ax = plt.subplot(gs[0, 1], projection=ccrs.PlateCarree())
+        ax.plot(lons[:, 0], lats[:, 0], ls="--", c="grey")
+        ax.plot(lons[:, -1], lats[:, -1], ls="--", c="grey")
+        ax.pcolormesh(lons, lats, p, norm=rain_norm)
+        ax.coastlines()
+
+        p_qprof = qprof_data["surface_precip"]
+        p = qprof_data["surface_precip"].data
+        p[~valid] = np.nan
+        ax = plt.subplot(gs[1, 0], projection=ccrs.PlateCarree())
+        ax.pcolormesh(lons, lats, p, norm=rain_norm)
+        ax.plot(lons[:, 0], lats[:, 0], ls="--", c="grey")
+        ax.plot(lons[:, -1], lats[:, -1], ls="--", c="grey")
+        fns = (p_qprof <= 1e-2)  * (p_mrms > 1e-2)
+        ax.scatter(lons.data[fns], lats.data[fns], c="white", marker=".", alpha=1.0)
+        ax.coastlines()
+
+        p_gprof = gprof_data["surface_precip"]
+        p = gprof_data["surface_precip"]
+        ax = plt.subplot(gs[1, 1], projection=ccrs.PlateCarree())
+        ax.pcolormesh(lons, lats, p, norm=rain_norm)
+        ax.plot(lons[:, 0], lats[:, 0], ls="--", c="grey")
+        ax.plot(lons[:, -1], lats[:, -1], ls="--", c="grey")
+        fns = (p_gprof <= 1e-2)  * (p_mrms > 1e-2)
+        ax.scatter(lons.data[fns], lats.data[fns], c="white", marker=".", alpha=0.2)
+        ax.coastlines()
+
+        plt.show()
+
+        return f
+
+    def plot_errors(self,
+                    granule,
+                    mark_fns=False):
+        import matplotlib.pyplot as plt
+        import cartopy.crs as ccrs
+        from matplotlib.colors import LogNorm, Normalize
+        from matplotlib.gridspec import GridSpec
+
+        try:
+            fs = self.validation_files[granule]
+        except KeyError:
+            raise Exception(f"No validation data available for granule {granule}.")
+
+        match_up_file = fs["match_up_file"]
+        gprof_file = fs["gprof_file"]
+        qprof_file = fs["qprof_file"]
+
+        mrms_data = xr.load_dataset(match_up_file)
+        gprof_data = RetrievalFile(gprof_file, has_sensitivity=True).to_xarray_dataset()
+        qprof_data = RetrievalFile(qprof_file).to_xarray_dataset()
+
+        gs = GridSpec(1, 2)
+        f = plt.figure(figsize=(15, 15))
+
+        rain_norm = LogNorm(1e-2, 1e2)
+        error_norm = Normalize(-1, 1)
+
+        lats = mrms_data["latitude"]
+        lons = mrms_data["longitude"]
+        valid = gprof_data["surface_precip"] >= 0.0
+
+        p_mrms = mrms_data["surface_precipitation"].data
+
+        p_qprof = qprof_data["surface_precip"].data
+        e = (p_qprof - p_mrms) / np.maximum(p_qprof, p_mrms)
+        e[~valid] = np.nan
+        e[p_mrms < 1e-2] = np.nan
+
+        ax = plt.subplot(gs[0, 0], projection=ccrs.PlateCarree())
+        ax.pcolormesh(lons, lats, e, norm=error_norm, cmap="coolwarm")
+        ax.plot(lons[:, 0], lats[:, 0], ls="--", c="grey")
+        ax.plot(lons[:, -1], lats[:, -1], ls="--", c="grey")
+        ax.coastlines()
+
+        p_gprof = gprof_data["surface_precip"].data
+        e = (p_gprof - p_mrms) / np.maximum(p_gprof, p_mrms)
+        e[~valid] = np.nan
+        e[p_mrms < 1e-2] = np.nan
+        ax = plt.subplot(gs[0, 1], projection=ccrs.PlateCarree())
+        ax.pcolormesh(lons, lats, e, norm=error_norm, cmap="coolwarm")
+        ax.plot(lons[:, 0], lats[:, 0], ls="--", c="grey")
+        ax.plot(lons[:, -1], lats[:, -1], ls="--", c="grey")
+        ax.coastlines()
+
+        plt.show()
+
+        return f
+
+    def plot_contours(self,
+                      granule,
+                      mrms_input_data=None):
+        import matplotlib.pyplot as plt
+        import cartopy.crs as ccrs
+        from matplotlib.colors import LogNorm, Normalize
+        from matplotlib.gridspec import GridSpec
+
+        try:
+            fs = self.validation_files[granule]
+        except KeyError:
+            raise Exception(f"No validation data available for granule {granule}.")
+
+        match_up_file = fs["match_up_file"]
+        gprof_file = fs["gprof_file"]
+        qprof_file = fs["qprof_file"]
+
+        mrms_data = xr.load_dataset(match_up_file)
+        gprof_data = RetrievalFile(gprof_file, has_sensitivity=True).to_xarray_dataset()
+        qprof_data = RetrievalFile(qprof_file).to_xarray_dataset()
+
+        gs = GridSpec(1, 1)
+        f = plt.figure(figsize=(15, 15))
+        levels = [1e0]#np.logspace(0, 2, 5)
+
+        lats = mrms_data["latitude"]
+        lons = mrms_data["longitude"]
+        valid = gprof_data["surface_precip"] >= 0.0
+
+        rain_norm = LogNorm(1e-2, 1e2)
+        p_mrms = mrms_data["surface_precipitation"].data
+        p_qprof = qprof_data["surface_precip"].data
+        p_gprof = gprof_data["surface_precip"].data
+
+        ax = plt.subplot(gs[0, 0], projection=ccrs.PlateCarree())
+        ax.contourf(lons, lats, np.maximum(p_mrms, 1e-2), cmap="plasma", norm=rain_norm)
+        ax.contour(lons, lats, p_gprof, levels=levels, cmap="Blues", norm=rain_norm)
+        ax.contour(lons, lats, p_qprof, levels=levels, cmap="Greens", norm=rain_norm)
+
+        #ax.scatter(lons, lats, marker=".", s=2, cmap="Greys", c="grey")
+
+        if mrms_input_data is not None:
+            lats = mrms_input_data["latitude"]
+            lons = mrms_input_data["longitude"]
+            p = mrms_input_data["precip_rate"]
+            for i in range(len(mrms_input_data.time)):
+                ax.contour(lons, lats, p.data[i, :, :], levels=levels, colors=f"C{i}", alpha=1.0, linewidths=1)
 
 
 
+        ax.coastlines()
 
-
-
-
-
-
-
-
-
-
-
-
+        return f
 

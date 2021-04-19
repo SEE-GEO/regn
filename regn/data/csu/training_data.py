@@ -47,6 +47,12 @@ def write_preprocessor_file(input_file,
         "brightness_temps": "brightness_temperatures"
     }
     n_pixels = 2048
+    if n_samples is None:
+        n_samples = data.samples.size
+
+    if n_samples < n_pixels:
+        n_pixels = n_samples
+
     if n_samples < data.samples.size:
         indices = np.random.permutation(data.samples.size)[:n_samples]
     else:
