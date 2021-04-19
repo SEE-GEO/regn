@@ -208,8 +208,6 @@ class GPROF0DDataset:
         """
         with Dataset(self.filename, "r") as dataset:
 
-            LOGGER.info("Loading data from file: %s", self.filename)
-
             variables = dataset.variables
             n = dataset.dimensions["samples"].size
 
@@ -230,8 +228,6 @@ class GPROF0DDataset:
 
             invalid = (bts > 500.0) + (bts < 0.0)
             bts[invalid] = -1.0
-
-            LOGGER.info("Loaded %s brightness temperatures.", n)
 
             # 2m temperature
             t2m = variables["two_meter_temperature"][:].reshape(-1, 1)
@@ -317,6 +313,7 @@ class GPROF0DDataset:
             i(int): The index of the sample to return
         """
         if i >= len(self):
+            LOGGER.info("Finished iterating through dataset %s.", self.filename)
             raise IndexError()
         if i == 0:
             self._shuffle()
