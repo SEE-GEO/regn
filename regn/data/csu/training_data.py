@@ -183,7 +183,7 @@ class GPROF0DDataset:
         if isinstance(self.y, dict):
             for k, y_k in self.y.items():
                 if np.any([y_k > 0.0]):
-                    non_zero = np.min(y_k[y_k > 0.0], initial=0.0)
+                    non_zero = np.min(y_k[y_k > 0.0])
                 else:
                     non_zero = 0.0
                 indices = (y_k < non_zero) * (y_k >= 0.0)
@@ -193,7 +193,7 @@ class GPROF0DDataset:
         else:
             y = self.y
             if np.any(y > 0.0):
-                non_zero = np.min(y[y > 0.0], initial=0.0)
+                non_zero = np.min(y[y > 0.0])
             else:
                 non_zero = 0.0
             indices = (y < non_zero) * (y >= 0.0)
@@ -627,7 +627,7 @@ class GPROFConvDataset:
         if isinstance(self.y, dict):
             for k, y_k in self.y.items():
                 if np.any(y_k > 0.0):
-                    non_zero = np.min(y_k[y_k > 0.0], initial=0.0)
+                    non_zero = np.min(y_k[y_k > 0.0])
                 else:
                     non_zero = 0.0
                 indices = (y_k < non_zero) * (y_k >= 0.0)
@@ -637,7 +637,7 @@ class GPROFConvDataset:
         else:
             y = self.y
             if np.any(y > 0.0):
-                non_zero = np.min(y[y > 0.0], initial=0.0)
+                non_zero = np.min(y[y > 0.0])
             else:
                 non_zero = 0.0
             indices = (y < non_zero) * (y >= 0.0)
