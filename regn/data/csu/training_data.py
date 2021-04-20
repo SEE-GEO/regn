@@ -263,7 +263,11 @@ class GPROF0DDataset:
             #
 
             if isinstance(self.target, list):
-                self.y = {l: variables[l][:] for l in self.target}
+                self.y = {}
+                for l in self.target:
+                    y = variables[l][:]
+                    y[y < 0.0] = -1.0
+                    self.y[l] = y
             else:
                 self.y = variables[self.target][:]
 
