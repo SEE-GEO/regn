@@ -284,7 +284,8 @@ def _process_input(input_filename,
                    start=1.0,
                    end=1.0,
                    include_profiles=False):
-    data = load_data(input_filename, start, end)
+    data = load_data(input_filename, start, end,
+                     include_profiles=include_profiles)
     output_file.add_data(data)
 
 async def process_input(loop,
