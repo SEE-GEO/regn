@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from regn.data.csu.bin import PROFILE_NAMES
 
 class GPROFNN0D(nn.Module):
     """

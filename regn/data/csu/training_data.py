@@ -6,6 +6,7 @@ regn.data.csu.training_data
 This module provides interface class to load the training and evaluation
  data for the NN-based GPROF algorithms.
 """
+from pathlib import Path
 import logging
 
 from netCDF4 import Dataset
@@ -139,7 +140,7 @@ class GPROF0DDataset:
             bins: If given, used to transform the training data to categorical
                  variables by binning using the bin boundaries in ``bins``.
         """
-        self.filename = filename
+        self.filename = Path(filename)
         self.target = target
         self.batch_size = batch_size
         self.shuffle = shuffle
@@ -255,7 +256,9 @@ class GPROF0DDataset:
             else:
                 self.y = variables[self.target][:]
 
-            LOGGER.info("Loaded %s samples from %s", self.x.shape[0], self.filename)
+            LOGGER.info("Loaded %s samples from %s",
+                        self.x.shape[0],
+                        self.filename.name)
 
     def save_data(self, filename):
         if self.normalize:
@@ -294,8 +297,8 @@ class GPROF0DDataset:
 
 
     def _shuffle(self):
-        LOGGER.info("Shuffling dataset %s.", self.filename)
         if not self._shuffled:
+            LOGGER.info("Shuffling dataset %s.", self.filename.name)
             indices = np.random.permutation(self.x.shape[0])
             self.x = self.x[indices, :]
             if isinstance(self.y, dict):
@@ -313,7 +316,8 @@ class GPROF0DDataset:
             i(int): The index of the sample to return
         """
         if i >= len(self):
-            LOGGER.info("Finished iterating through dataset %s.", self.filename)
+            LOGGER.info("Finished iterating through dataset %s.",
+                        self.filename.name)
             raise IndexError()
         if i == 0:
             self._shuffle()
@@ -657,7 +661,8 @@ class GPROFConvDataset:
 
         with Dataset(self.filename, "r") as dataset:
 
-            LOGGER.info("Loading data from file: %s", self.filename)
+            LOGGER.info("Loading data from file: %s",
+                        self.filename.name)
 
             variables = dataset.variables
             n = dataset.dimensions["samples"].size

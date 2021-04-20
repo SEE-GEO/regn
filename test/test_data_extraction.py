@@ -21,7 +21,7 @@ def test_file_processor(tmp_path):
     the extracted dataset matches the original data.
     """
     path = Path(__file__).parent
-    processor = FileProcessor(path / "data")
+    processor = FileProcessor(path / "data", include_profiles=True)
     output_file = tmp_path / "test_file.nc"
     processor.run_async(output_file, 0.0, 1.0, 1)
 

@@ -282,7 +282,8 @@ GPM_FILE_REGEXP = re.compile(r"gpm_(\d\d\d)_(\d\d)(_(\d\d))?_(\d\d).bin")
 def _process_input(input_filename,
                    output_file,
                    start=1.0,
-                   end=1.0):
+                   end=1.0,
+                   include_profiles=False):
     data = load_data(input_filename, start, end)
     output_file.add_data(data)
 
@@ -291,7 +292,8 @@ async def process_input(loop,
                         input_filename,
                         output_file,
                         start=0.0,
-                        end=1.0):
+                        end=1.0,
+                        include_profiles=False):
     """
     Asynchronous processing of an intput file.
 
@@ -304,7 +306,15 @@ async def process_input(loop,
         start: Fractional position from which to start reading the data.
         end: Fractional position up to which to read the data.
     """
-    await loop.run_in_executor(pool, _process_input, input_filename, output_file, start, end)
+    await loop.run_in_executor(
+        pool,
+        _process_input,
+        input_filename,
+        output_file,
+        start,
+        end,
+        include_profiles
+    )
 
 
 class FileProcessor:
@@ -316,7 +326,8 @@ class FileProcessor:
                  st_min=227.0,
                  st_max=307.0,
                  tpw_min=0.0,
-                 tpw_max=76.0):
+                 tpw_max=76.0,
+                 include_profiles=False):
         """
         Create file processor to process file in given path.
 
@@ -329,7 +340,7 @@ class FileProcessor:
 
         """
         self.path = path
-
+        self.include_profiles = include_profiles
         self.files = []
 
         for f in Path(path).iterdir():
@@ -373,7 +384,8 @@ class FileProcessor:
                                    f,
                                    output_file,
                                    start=start_fraction,
-                                   end=end_fraction)
+                                   end=end_fraction,
+                                   include_profiles=self.include_profiles)
                      for f in self.files]
             for t in tqdm.asyncio.tqdm.as_completed(tasks):
                 await t
