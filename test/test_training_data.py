@@ -12,6 +12,7 @@ from quantnn.qrnn import QRNN
 from quantnn.models.pytorch.xception import XceptionFpn
 
 from regn.data.csu.training_data import (GPROF0DDataset,
+                                         GPROF0DDatasetLazy,
                                          GPROFValidationDataset,
                                          GPROFConvDataset,
                                          GPROFConvValidationDataset,
@@ -26,7 +27,7 @@ def test_gprof_0d_dataset():
     """
     path = Path(__file__).parent
     input_file = path / "data" / "dataset_0d.nc"
-    dataset = GPROF0DDataset(input_file, batch_size=2)
+    dataset = GPROF0DDataset(input_file, batch_size=1)
 
     xs = []
     ys = []
@@ -44,8 +45,41 @@ def test_gprof_0d_dataset():
     x_mean = xs.sum(dim=0).detach().numpy()
     y_mean = ys.sum(dim=0).detach().numpy()
 
-    assert np.all(np.isclose(x_mean, x_mean_ref, atol=1e-6))
-    assert np.all(np.isclose(y_mean, y_mean_ref, atol=1e-6))
+    assert np.all(np.isclose(x_mean, x_mean_ref, atol=1e-3))
+    assert np.all(np.isclose(y_mean, y_mean_ref, atol=1e-3))
+
+def test_gprof_0d_dataset_lazy():
+    """
+    Ensure that iterating over single-pixel dataset conserves
+    statistics.
+    """
+    path = Path(__file__).parent
+    input_file = path / "data" / "dataset_0d.nc"
+
+    dataset = GPROF0DDatasetLazy(input_file, batch_size=None)
+    x_all, y_all = next(iter(dataset))
+
+    dataset = GPROF0DDatasetLazy(input_file, batch_size=1)
+
+    xs = []
+    ys = []
+
+    for x, y in dataset:
+        xs.append(x)
+        ys.append(y)
+
+    x = torch.cat(xs, 0)
+    y = torch.cat(ys, 0)
+
+    x_ref = x_all.sum(axis=0).detach().numpy()
+    y_ref = y_all.sum(axis=0).detach().numpy()
+
+    x = x.sum(axis=0).detach().numpy()
+    y = y.sum(axis=0).detach().numpy()
+
+    assert np.all(np.isclose(x, x_ref, atol=1e-3))
+    assert np.all(np.isclose(y, y_ref, atol=1e-3))
+
 
 def test_gprof_0d_dataset_multi_target():
     """
@@ -56,7 +90,7 @@ def test_gprof_0d_dataset_multi_target():
     input_file = path / "data" / "dataset_0d.nc"
     dataset = GPROF0DDataset(input_file,
                              target=["surface_precip", "convective_precip"],
-                             batch_size=2)
+                             batch_size=1)
 
     xs = []
     ys = {}
@@ -75,7 +109,7 @@ def test_gprof_0d_dataset_multi_target():
     x_mean = xs.sum(dim=0).detach().numpy()
     y_mean = {k: ys[k].sum(dim=0).detach().numpy() for k in ys}
 
-    assert np.all(np.isclose(x_mean, x_mean_ref, atol=1e-6))
+    assert np.all(np.isclose(x_mean, x_mean_ref, atol=1e-3))
     for k in y_mean_ref:
         assert np.all(np.isclose(y_mean[k], y_mean_ref[k], atol=1e-6))
 
@@ -99,8 +133,6 @@ def test_save_data(tmp_path):
                               shuffle=False,
                               batch_size=2)
 
-    print(dataset.x)
-    print(dataset2.x)
 
     assert np.all(np.isclose(dataset.x, dataset2.x))
     assert np.all(np.isclose(dataset.x, dataset2.x))

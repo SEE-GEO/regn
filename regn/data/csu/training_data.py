@@ -15,6 +15,7 @@ import torch
 from tqdm import tqdm
 import xarray as xr
 
+import quantnn
 from quantnn.normalizer import MinMaxNormalizer, Normalizer
 from quantnn.drnn import _to_categorical
 import quantnn.quantiles as qq
@@ -29,6 +30,15 @@ if torch.cuda.is_available():
     _DEVICE = torch.device("cuda")
 
 
+def _apply(f, y):
+    """
+    Helper function to apply function to single array or element-wise
+    to a dict of arrays.
+    """
+    if isinstance(y, dict):
+        return {k: f(y[k]) for k in y}
+    else:
+        return f(y)
 
 def write_preprocessor_file(input_file,
                             output_file,
@@ -77,15 +87,16 @@ def write_preprocessor_file(input_file,
     for k in data:
         da = data[k]
         n_dims = len(da.dims)
-        s = shape[:n_dims + 1]
+        s = (n_scans, n_pixels) + da.data.shape[1:]
         new_data = np.zeros(s)
         n = da.data.size
         new_data.ravel()[:n] = da.data.ravel()
         new_data.ravel()[n:] = np.nan
-        new_dataset[k] = ((dims[:n_dims + 1]), new_data)
+        dims = ("scans", "pixels") + da.dims[1:]
+        new_dataset[k] = (dims, new_data)
 
     new_dataset["earth_incidence_angle"] = (
-        dims,
+        ("scans", "pixels", "channels"),
         np.broadcast_to(data.attrs["nominal_eia"].reshape(1, 1, -1),
                         (n_scans, n_pixels, 15))
     )
@@ -538,6 +549,389 @@ class GPROFValidationDataset(GPROF0DDataset):
                          normalizer=normalizer,
                          shuffle=False,
                          bins=None)
+
+
+class GPROF0DDatasetLazy:
+    """
+    Dataset class providing an interface for the single-pixel GPROF
+    training dataset mapping TBs and ancillary data to surface precip
+    values and other target variables.
+
+    Attributes:
+        x: Rank-2 tensor containing the input data with
+           samples along first dimension.
+        y: The target values
+        filename: The filename from which the data is loaded.
+        target: The name of the variable used as target variable.
+        batch_size: The size of data batches returned by __getitem__ method.
+        normalizer: The normalizer used to normalize the data.
+        shuffle: Whether or not the ordering of the data is shuffled.
+    """
+
+    def __init__(
+        self,
+        filename,
+        target="surface_precip",
+        normalizer=None,
+        transform_zeros=True,
+        batch_size=None,
+        shuffle=True,
+        bins=None,
+    ):
+        """
+        Create GPROF 0D dataset.
+
+        Args:
+            filename: Path to the NetCDF file containing the data to
+                 0D training data toload.
+            target: The variable to use as target (output) variable.
+            transform_zeros: Whether or not to replace very small
+                 and zero rain with random amounts in the range [1e-6, 1e-4]
+            batch_size: Number of samples in each training batch.
+            shuffle: Whether or not to shuffle the training data.
+            bins: If given, used to transform the training data to categorical
+                 variables by binning using the bin boundaries in ``bins``.
+        """
+        self.filename = Path(filename)
+        self.target = target
+        self.shuffle = shuffle
+        self.bins = bins
+
+        # Determine numbers of samples in dataset.
+        with Dataset(self.filename, "r") as dataset:
+            self.n_samples = dataset.dimensions["samples"].size
+
+        if batch_size is None:
+            self.batch_size = self.n_samples
+        else:
+            self.batch_size = batch_size
+
+        if normalizer is None:
+            self.normalizer = quantnn.normalizer.Identity()
+        else:
+            self.normalizer = normalizer
+
+        if bins is not None:
+            self.binned = True
+        else:
+            self.binned = False
+
+        if self.shuffle:
+            self.indices = np.random.permutation(self.n_samples)
+        else:
+            self.indices = np.arange(self.n_samples)
+        self._shuffled = False
+
+
+    def transform_zeros(self, y):
+        """
+        Transforms target values that are zero to small, non-zero values.
+        """
+        thresh = 1e-4
+
+        def transform(y):
+            indices = (y < thresh) * (y >= 0.0)
+            y[indices] = np.random.uniform(thresh * 0.1,
+                                           thresh,
+                                           indices.sum())
+            return y
+
+        return _apply(transform, y)
+
+    def transform_categorical(self, y):
+        """
+        Transforms target values that are zero to small, non-zero values.
+        """
+        thresh = 1e-4
+        def transform(y):
+            return _to_categorical(y, bins)
+
+        return _apply(transform, y)
+
+
+    def load_batch(self, i):
+        """
+        Loads the data from the file into the classes ``x`` attribute.
+        """
+        i_start = i * self.batch_size
+        i_end = i_start + self.batch_size
+        indices = self.indices[i_start:i_end]
+
+        with Dataset(self.filename, "r") as dataset:
+
+            variables = dataset.variables
+            n = self.batch_size
+
+            #
+            # Input data
+            #
+
+
+            bts = dataset["brightness_temps"][indices]
+            invalid = (bts > 500.0) + (bts < 0.0)
+            bts[invalid] = -1.0
+
+            # 2m temperature
+            t2m = variables["two_meter_temperature"][indices].reshape(-1, 1)
+            # Total precitable water.
+            tcwv = variables["total_column_water_vapor"][indices].reshape(-1, 1)
+            # Surface type
+            st = variables["surface_type"][indices]
+            n_types = 19
+            st_1h = np.zeros((n, n_types), dtype=np.float32)
+            st_1h[np.arange(n), st.ravel()] = 1.0
+            # Airmass type
+            am = variables["airmass_type"][indices]
+            n_types = 4
+            am_1h = np.zeros((n, n_types), dtype=np.float32)
+            am_1h[np.arange(n), am.ravel()] = 1.0
+
+            x = np.concatenate([bts, t2m, tcwv, st_1h, am_1h], axis=1)
+
+            #
+            # Output data
+            #
+
+            if isinstance(self.target, list):
+                y = {l: variables[l][indices] for l in self.target}
+            else:
+                y = variables[self.target][indices]
+        return x, y
+
+    def save_data(self, filename):
+        if self.normalize:
+            x = self.normalizer.invert(self.x)
+        else:
+            x = self.x
+
+        if self.binned:
+            centers = 0.5 * (self.bins[1:] + self.bins[:-1])
+            y = centers[self.y]
+        else:
+            y = self.y
+
+        bts = x[:, :15]
+        t2m = x[:, 15]
+        tcwv = x[:, 16]
+        st = np.where(x[:, 17:17+19])[1]
+        at = np.where(x[:, 17+19:17+23])[1]
+
+        dataset = xr.open_dataset(self.filename)
+
+        dims = ("samples", "channel")
+        new_dataset = {
+            "brightness_temps": (dims, bts),
+            "two_meter_temperature": (dims[:1], t2m),
+            "total_column_water_vapor": (dims[:1], tcwv),
+            "surface_type": (dims[:1], st),
+            "airmass_type": (dims[:1], at),
+            "surface_precip": (dims[:1], y)
+        }
+        new_dataset = xr.Dataset(new_dataset)
+        new_dataset.attrs = dataset.attrs
+
+        new_dataset.to_netcdf(filename)
+
+
+
+    def _shuffle(self):
+        if self.shuffle and not self._shuffled:
+            indices = np.random.permutation(self.n_samples)
+            self._shuffled = True
+
+    def __getitem__(self, i):
+        """
+        Return element from the dataset. This is part of the
+        pytorch interface for datasets.
+
+        Args:
+            i(int): The index of the sample to return
+        """
+        if i >= len(self):
+            raise IndexError()
+        if i == 0:
+            self._shuffle()
+        self._shuffled = False
+
+        x, y = self.load_batch(i)
+
+        if self.transform_zeros:
+            y = self.transform_zeros(y)
+        if self.bins:
+            y = self.transform_categorical(y)
+
+        def to_tensor(x):
+            return torch.tensor(x.astype(np.float32))
+
+        x = to_tensor(x)
+        y = _apply(to_tensor, y)
+
+        return x, y
+
+    def __len__(self):
+        """
+        The number of samples in the dataset.
+        """
+        return self.n_samples // self.batch_size
+
+    def evaluate(self, model, batch_size=16384, device=_DEVICE):
+        """
+        Run retrieval on test dataset and returns results as
+        xarray Dataset.
+
+        Args:
+            model: The QRNN or DRNN model to evaluate.
+            batch_size: The batch size to use for the evaluation.
+            device: On which device to run the evaluation.
+
+        Return:
+            ``xarray.Dataset`` containing the predicted and reference values
+            for the data in this dataset.
+        """
+        n_samples = self.x.shape[0]
+        y_means = []
+        y_medians = []
+        dy_means = []
+        dy_medians = []
+        pops = []
+        y_trues = []
+        surfaces = []
+        airmasses = []
+        y_samples = []
+
+        st_indices = torch.arange(19).reshape(1, -1).to(device)
+        am_indices = torch.arange(4).reshape(1, -1).to(device)
+        i_start = 0
+        model.model.to(device)
+
+        with torch.no_grad():
+            for i in tqdm(range(n_samples // batch_size + 1)):
+                i_start = i * batch_size
+                i_end = i_start + batch_size
+                if i_start >= n_samples:
+                    break
+
+                x = torch.tensor(self.x[i_start:i_end]).float().to(device)
+                y = torch.tensor(self.y[i_start:i_end]).float().to(device)
+                i_start += batch_size
+
+                y_pred = model.predict(x)
+                y_mean = model.posterior_mean(y_pred=y_pred).reshape(-1)
+                dy_mean = y_mean - y
+                y_median = model.posterior_quantiles(
+                    y_pred=y_pred, quantiles=[0.5]
+                ).squeeze(1)
+                y_sample = model.sample_posterior(y_pred=y_pred).squeeze(1)
+                dy_median = y_median - y
+
+                y_samples.append(y_sample.cpu())
+                y_means.append(y_mean.cpu())
+                dy_means.append(dy_mean.cpu())
+                y_medians.append(y_median.cpu())
+                dy_medians.append(dy_median.cpu())
+
+                pops.append(model.probability_larger_than(y_pred=y_pred, y=1e-2).cpu())
+                y_trues.append(y.cpu())
+
+                surfaces += [(x[:, 17:36] * st_indices).sum(1).cpu()]
+                airmasses += [(x[:, 36:] * am_indices).sum(1).cpu()]
+
+        y_means = torch.cat(y_means, 0).detach().numpy()
+        y_medians = torch.cat(y_medians, 0).detach().numpy()
+        y_samples = torch.cat(y_samples, 0).detach().numpy()
+        dy_means = torch.cat(dy_means, 0).detach().numpy()
+        dy_medians = torch.cat(dy_medians, 0).detach().numpy()
+        pops = torch.cat(pops, 0).detach().numpy()
+        y_trues = torch.cat(y_trues, 0).detach().numpy()
+        surfaces = torch.cat(surfaces, 0).detach().numpy()
+        airmasses = torch.cat(airmasses, 0).detach().numpy()
+
+        dims = ["samples"]
+
+        data = {
+            "y_mean": (dims, y_means),
+            "y_sampled": (dims, y_samples),
+            "y_median": (dims, y_medians),
+            "dy_mean": (dims, dy_means),
+            "dy_median": (dims, dy_medians), "y": (dims, y_trues),
+            "pop": (dims, pops),
+            "surface_type": (dims, surfaces),
+            "airmass_type": (dims, airmasses),
+        }
+        return xr.Dataset(data)
+
+    def evaluate_sensitivity(self, model, batch_size=512, device=_DEVICE):
+        """
+        Run retrieval on dataset.
+        """
+        n_samples = self.x.shape[0]
+        y_means = []
+        y_trues = []
+        grads = []
+        surfaces = []
+        airmasses = []
+        dydxs = []
+
+        st_indices = torch.arange(19).reshape(1, -1).to(device)
+        am_indices = torch.arange(4).reshape(1, -1).to(device)
+        i_start = 0
+        model.model.to(device)
+
+        loss = torch.nn.MSELoss()
+
+        model.model.eval()
+
+        for i in tqdm(range(n_samples // batch_size + 1)):
+            i_start = i * batch_size
+            i_end = i_start + batch_size
+            if i_start >= n_samples:
+                break
+
+            model.model.zero_grad()
+
+            x = torch.tensor(self.x[i_start:i_end]).float().to(device)
+            x_l = x.clone()
+            x_l[:, 0] -= 0.01
+            x_r = x.clone()
+            x_r[:, 0] += 0.01
+            y = torch.tensor(self.y[i_start:i_end]).float().to(device)
+
+            x.requires_grad = True
+            y.requires_grad = True
+            i_start += batch_size
+
+            y_pred = model.predict(x)
+            y_mean = model.posterior_mean(y_pred=y_pred).reshape(-1)
+            y_mean_l = model.posterior_mean(x_l).reshape(-1)
+            y_mean_r = model.posterior_mean(x_r).reshape(-1)
+            dydx = (y_mean_r - y_mean_l) / 0.02
+            torch.sum(y_mean).backward()
+
+            y_means.append(y_mean.detach().cpu())
+            y_trues.append(y.detach().cpu())
+            grads.append(x.grad[:, :15].cpu())
+            surfaces += [(x[:, 17:36] * st_indices).sum(1).cpu()]
+            airmasses += [(x[:, 36:] * am_indices).sum(1).cpu()]
+            dydxs += [dydx.cpu()]
+
+        y_means = torch.cat(y_means, 0).detach().numpy()
+        y_trues = torch.cat(y_trues, 0).detach().numpy()
+        grads = torch.cat(grads, 0).detach().numpy()
+        surfaces = torch.cat(surfaces, 0).detach().numpy()
+        airmasses = torch.cat(airmasses, 0).detach().numpy()
+        dydxs = torch.cat(dydxs, 0).detach().numpy()
+
+        dims = ["samples"]
+
+        data = {
+            "gradients": (dims + ["channels",], grads),
+            "surface_type": (dims, surfaces),
+            "airmass_type": (dims, airmasses),
+            "y_mean": (dims, y_means),
+            "y_true": (dims, y_trues),
+            "dydxs": (dims, dydxs)
+        }
+        return xr.Dataset(data)
 
 ###############################################################################
 # Convolutional dataset

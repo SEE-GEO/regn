@@ -36,7 +36,10 @@ class GPROFNN0D(nn.Module):
         if isinstance(self.target, list):
             self.heads = {}
             for k in self.target:
-                l = nn.Linear(n_neurons, n_quantiles)
+                if k in PROFILE_NAMES:
+                    l = nn.Linear(n_neurons, 28 * n_quantiles)
+                else:
+                    l = nn.Linear(n_neurons, n_quantiles)
                 setattr(self, "head_" + k, l)
                 self.heads[k] = l
         else:
@@ -56,6 +59,13 @@ class GPROFNN0D(nn.Module):
         """
         y = self.layers(x)
         if isinstance(self.target, list):
-            return {k: self.heads[k](y) for k in self.target}
+            results = {}
+            for k in self.target:
+                results[k] = self.heads[k](y)
+                if k in PROFILE_NAMES:
+                    shape = (-1, self.n_quantiles, 28)
+                    results[k] = results[k].reshape(shape)
+                    print(shape)
+            return results
         else:
             return self.head(y)
