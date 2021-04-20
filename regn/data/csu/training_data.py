@@ -754,6 +754,7 @@ class GPROF0DDatasetLazy:
         self._shuffled = False
 
         x, y = self.load_batch(i)
+        x = self.normalizer(x)
 
         if self.transform_zeros:
             y = self.transform_zeros(y)
