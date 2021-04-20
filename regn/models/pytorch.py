@@ -20,11 +20,13 @@ class GPROFNN0D(nn.Module):
                  n_layers,
                  n_neurons,
                  n_quantiles,
-                 target="surface_precip"):
+                 target="surface_precip",
+                 exp_activation=False):
         self.n_layers = n_layers
         self.n_neurons = n_neurons
         self.n_quantiles = n_quantiles
         self.target = target
+        self.exp_activation = exp_activation
 
         super().__init__()
         self.layers = nn.Sequential(*(
@@ -61,11 +63,20 @@ class GPROFNN0D(nn.Module):
         if isinstance(self.target, list):
             results = {}
             for k in self.target:
-                results[k] = self.heads[k](y)
+                if self.exp_activation:
+                    results[k] = torch.exp(self.heads[k](y))
+                else:
+                    results[k] = self.heads[k](y)
+
                 if k in PROFILE_NAMES:
                     shape = (-1, self.n_quantiles, 28)
-                    results[k] = results[k].reshape(shape)
-                    print(shape)
+                    if self.exp_activation:
+                        results[k] = torch.exp(results[k].reshape(shape))
+                    else:
+                        results[k] = results[k].reshape(shape)
             return results
         else:
-            return self.head(y)
+            if self.exp_activation:
+                return torch.exp(self.head(y))
+            else:
+                return self.head(y)
