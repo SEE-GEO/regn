@@ -266,7 +266,7 @@ class GPROF0DDataset:
                 self.y = {}
                 for l in self.target:
                     y = variables[l][:]
-                    y[y < 0.0] = -1.0
+                    y[y < 0.0] = 0.0
                     self.y[l] = y
             else:
                 self.y = variables[self.target][:]
