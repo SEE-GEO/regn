@@ -36,7 +36,7 @@ _THRESHOLDS = {
     "rain_water_path": 1e-4,
     "ice_water_path": 1e-4,
     "cloud_water_path": 1e-4,
-    "column_water_vapor": 1e0,
+    "total_column_water_vapor": 1e0,
     "rain_water_content": 1e-5,
     "ice_water_content": 1e-5,
     "snow_water_content": 1e-5,
