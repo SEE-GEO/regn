@@ -30,6 +30,19 @@ if torch.cuda.is_available():
     _DEVICE = torch.device("cuda")
 
 
+_THRESHOLDS = {
+    "surface_precip": 1e-4,
+    "convective_precip": 1e-4,
+    "rain_water_path": 1e-4,
+    "ice_water_path": 1e-4,
+    "cloud_water_path": 1e-4,
+    "column_water_vapor": 1e0,
+    "rain_water_content": 1e-5,
+    "ice_water_content": 1e-5,
+    "snow_water_content": 1e-5,
+    "latent_heat": -99999
+}
+
 def _apply(f, y):
     """
     Helper function to apply function to single array or element-wise
@@ -194,23 +207,17 @@ class GPROF0DDataset:
         """
         if isinstance(self.y, dict):
             for k, y_k in self.y.items():
-                if np.any([y_k > 0.0]):
-                    non_zero = np.min(y_k[y_k > 0.0])
-                else:
-                    non_zero = 0.0
-                indices = (y_k < non_zero) * (y_k >= 0.0)
-                y_k[indices] = np.random.uniform(non_zero * 0.1,
-                                                 non_zero,
+                threshold = _THRESHOLDS[k]
+                indices = (y_k < threshold) * (y_k >= threshold)
+                y_k[indices] = np.random.uniform(threshold * 0.1,
+                                                 threshold,
                                                  indices.sum())
         else:
+            threshold = _THRESHOLDS[self.target]
             y = self.y
-            if np.any(y > 0.0):
-                non_zero = np.min(y[y > 0.0])
-            else:
-                non_zero = 0.0
-            indices = (y < non_zero) * (y >= 0.0)
-            y[indices] = np.random.uniform(non_zero * 0.1,
-                                           non_zero,
+            indices = (y < threshold) * (y >= 0.0)
+            y[indices] = np.random.uniform(threshold,
+                                           threshold,
                                            indices.sum())
 
 
@@ -755,6 +762,8 @@ class GPROF0DDatasetLazy:
             raise IndexError()
         if i == 0:
             self._shuffle()
+            if self.transform_zeros:
+                self._transform_zeros()
         self._shuffled = False
 
         x, y = self.load_batch(i)
