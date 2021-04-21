@@ -29,6 +29,8 @@ def test_gprof_0d_dataset():
     input_file = path / "data" / "dataset_0d.nc"
     dataset = GPROF0DDataset(input_file, batch_size=1)
 
+    print(dataset)
+
     xs = []
     ys = []
 

@@ -201,6 +201,12 @@ class GPROF0DDataset:
         if self.shuffle:
             self._shuffle()
 
+    def __repr__(self):
+        return f"GPROF0DDataset({self.filename.name}, n_batches={len(self)})"
+
+    def __str__(self):
+        return f"GPROF0DDataset({self.filename.name}, n_batches={len(self)})"
+
     def _transform_zeros(self):
         """
         Transforms target values that are zero to small, non-zero values.
@@ -219,7 +225,6 @@ class GPROF0DDataset:
             y[indices] = np.random.uniform(threshold,
                                            threshold,
                                            indices.sum())
-
 
     def _load_data(self):
         """
@@ -316,8 +321,6 @@ class GPROF0DDataset:
 
         new_dataset.to_netcdf(filename)
 
-
-
     def _shuffle(self):
         if not self._shuffled:
             LOGGER.info("Shuffling dataset %s.", self.filename.name)
@@ -343,6 +346,8 @@ class GPROF0DDataset:
             raise IndexError()
         if i == 0:
             self._shuffle()
+            if self.transform_zeros:
+                self._transform_zeros()
 
         self._shuffled = False
         if self.batch_size is None:
@@ -763,7 +768,7 @@ class GPROF0DDatasetLazy:
         if i == 0:
             self._shuffle()
             if self.transform_zeros:
-                self._transform_zeros()
+                self.transform_zeros()
         self._shuffled = False
 
         x, y = self.load_batch(i)
