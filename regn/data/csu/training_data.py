@@ -168,6 +168,7 @@ class GPROF0DDataset:
         self.target = target
         self.batch_size = batch_size
         self.shuffle = shuffle
+        self.transform_zeros = transform_zeros
         self._load_data()
 
         indices_1h = list(range(17, 40))
@@ -214,15 +215,15 @@ class GPROF0DDataset:
         if isinstance(self.y, dict):
             for k, y_k in self.y.items():
                 threshold = _THRESHOLDS[k]
-                indices = (y_k < threshold) * (y_k >= threshold)
-                y_k[indices] = np.random.uniform(threshold * 0.1,
+                indices = (y_k < threshold) * (y_k >= 0.0)
+                y_k[indices] = np.random.uniform(threshold * 0.01,
                                                  threshold,
                                                  indices.sum())
         else:
             threshold = _THRESHOLDS[self.target]
             y = self.y
             indices = (y < threshold) * (y >= 0.0)
-            y[indices] = np.random.uniform(threshold,
+            y[indices] = np.random.uniform(threshold * 0.01,
                                            threshold,
                                            indices.sum())
 
@@ -658,9 +659,8 @@ class GPROF0DDatasetLazy:
         """
         Transforms target values that are zero to small, non-zero values.
         """
-        thresh = 1e-4
         def transform(y):
-            return _to_categorical(y, bins)
+            return _to_categorical(y, self.bins)
 
         return _apply(transform, y)
 
