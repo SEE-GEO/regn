@@ -5,9 +5,11 @@ from regn.data.csu.bin import PROFILE_NAMES
 
 class QuantileHead(nn.Module):
     def __init__(self, n_inputs, n_quantiles):
+        super().__init__()
         self.upper = nn.Linear(n_inputs, n_quantiles // 2)
         self.median = nn.Linear(n_inputs, 1)
         self.lower = nn.Linear(n_inputs, n_quantiles // 2)
+        self.odd = n_quantiles % 2 > 0
 
     def forward(self, x):
         m = self.median(x)
@@ -38,20 +40,38 @@ class GPROFNN0D(nn.Module):
                  n_quantiles,
                  target="surface_precip",
                  exp_activation=False,
-                 quantile_heads=False):
+                 residuals=True,
+                 batch_norm=False,
+                 quantile_head=False):
         self.n_layers = n_layers
         self.n_neurons = n_neurons
         self.n_quantiles = n_quantiles
         self.target = target
         self.exp_activation = exp_activation
-        self.quantile_heads = quantiles_heads
+        self.quantile_head=quantile_head
+        self.residuals = residuals
 
         super().__init__()
-        self.layers = nn.Sequential(*(
-            [nn.Linear(40, n_neurons), nn.ReLU()] +
-            [nn.Linear(n_neurons, n_neurons), nn.ReLU()] * (n_layers - 2)
-            )
-        )
+        self.layers = nn.ModuleList()
+
+        if batch_norm:
+            self.layers.append(nn.Sequential(nn.Linear(40, n_neurons, bias=False),
+                                             nn.BatchNorm1d(n_neurons),
+                                             nn.ReLU()))
+            for i in range(n_layers - 2):
+                self.layers.append(nn.Sequential(
+                    nn.Linear(n_neurons, n_neurons, bias=False),
+                    nn.BatchNorm1d(n_neurons),
+                    nn.ReLU())
+                )
+        else:
+            self.layers.append(nn.Sequential(nn.Linear(40, n_neurons),
+                                             nn.ReLU()))
+            for i in range(n_layers - 2):
+                self.layers.append(nn.Sequential(
+                    nn.Linear(n_neurons, n_neurons),
+                    nn.ReLU())
+                )
 
         if isinstance(self.target, list):
             self.heads = {}
@@ -60,7 +80,7 @@ class GPROFNN0D(nn.Module):
                     n_outputs = 28 * n_quantiles
                 else:
                     n_outputs = n_quantiles
-                if self.quantile_heads:
+                if self.quantile_head:
                     l = QuantileHead(n_neurons, n_outputs)
                 else:
                     l = nn.Linear(n_neurons, n_outputs)
@@ -81,21 +101,23 @@ class GPROFNN0D(nn.Module):
             In the case of a single-target network a single tensor. In
             the case of a multi-target network a dictionary of tensors.
         """
-        y = self.layers(x)
+        for l in self.layers:
+            y = l(x)
+            if self.residuals:
+                y[:, :x.shape[1]] += x
+            x = y
+
         if isinstance(self.target, list):
             results = {}
             for k in self.target:
-                if self.exp_activation:
+                if self.exp_activation and k != "latent_heat":
                     results[k] = torch.exp(self.heads[k](y))
                 else:
                     results[k] = self.heads[k](y)
 
+                shape = (-1, self.n_quantiles, 28)
                 if k in PROFILE_NAMES:
-                    shape = (-1, self.n_quantiles, 28)
-                    if self.exp_activation:
-                        results[k] = torch.exp(results[k].reshape(shape))
-                    else:
-                        results[k] = results[k].reshape(shape)
+                    results[k] = results[k].reshape(shape)
             return results
         else:
             if self.exp_activation:
