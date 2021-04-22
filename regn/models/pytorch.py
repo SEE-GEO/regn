@@ -1,6 +1,22 @@
 import torch
 from torch import nn
+from torch.nn.functional import softplus
 from regn.data.csu.bin import PROFILE_NAMES
+
+class QuantileHead(nn.Module):
+    def __init__(self, n_inputs, n_quantiles):
+        self.upper = nn.Linear(n_inputs, n_quantiles // 2)
+        self.median = nn.Linear(n_inputs, 1)
+        self.lower = nn.Linear(n_inputs, n_quantiles // 2)
+
+    def forward(self, x):
+        m = self.median(x)
+        upper = m + torch.cumsum(softplus(self.upper(x)), 1)
+        lower = m - torch.cumsum(softplus(self.lower(x)), 1)
+        if self.odd:
+            return torch.cat([lower, m, upper], 1)
+        return torch.cat([lower, upper], 1)
+
 
 class GPROFNN0D(nn.Module):
     """
@@ -21,12 +37,14 @@ class GPROFNN0D(nn.Module):
                  n_neurons,
                  n_quantiles,
                  target="surface_precip",
-                 exp_activation=False):
+                 exp_activation=False,
+                 quantile_heads=False):
         self.n_layers = n_layers
         self.n_neurons = n_neurons
         self.n_quantiles = n_quantiles
         self.target = target
         self.exp_activation = exp_activation
+        self.quantile_heads = quantiles_heads
 
         super().__init__()
         self.layers = nn.Sequential(*(
@@ -39,9 +57,13 @@ class GPROFNN0D(nn.Module):
             self.heads = {}
             for k in self.target:
                 if k in PROFILE_NAMES:
-                    l = nn.Linear(n_neurons, 28 * n_quantiles)
+                    n_outputs = 28 * n_quantiles
                 else:
-                    l = nn.Linear(n_neurons, n_quantiles)
+                    n_outputs = n_quantiles
+                if self.quantile_heads:
+                    l = QuantileHead(n_neurons, n_outputs)
+                else:
+                    l = nn.Linear(n_neurons, n_outputs)
                 setattr(self, "head_" + k, l)
                 self.heads[k] = l
         else:
