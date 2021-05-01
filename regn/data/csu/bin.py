@@ -16,6 +16,7 @@ import re
 
 from netCDF4 import Dataset
 import numpy as np
+import xarray as xr
 import tqdm.asyncio
 
 LOGGER = logging.getLogger(__name__)
@@ -140,6 +141,7 @@ class GPROFGMIBinFile:
         """
         n_start = int(start * self.n_profiles)
         n_end = int(end * self.n_profiles)
+        n_samples = n_end - n_start
         indices = self.indices[n_start:n_end]
 
         results = {}
@@ -149,15 +151,30 @@ class GPROFGMIBinFile:
                 continue
             if type(t) is str:
                 view = self.handle[k].view(t)
-                results[k] = view[indices]
+                results[k] = ("samples",), view[indices]
             else:
                 view = self.handle[k].view(f"{len(t)}{t[0][1]}")
-                results[k] = view[indices]
-        results["surface_type"] = self.surface_type * np.ones(1, dtype=np.int)
-        results["airmass_type"] = self.airmass_type * np.ones(1, dtype=np.int)
-        results["tpw"] = self.tpw * np.ones(1, dtype=np.float)
-        results["temperature"] = self.temperature * np.ones(1)
-        return results
+                if len(t) == 15:
+                    results[k] = (("samples", "channel"), view[indices])
+                else:
+                    results[k] = (("samples", "layer"), view[indices])
+
+        results["surface_type"] = (
+            ("samples",),
+            self.surface_type * np.ones(n_samples, dtype=np.int)
+        )
+        results["airmass_type"] = (
+            ("samples",),
+            self.airmass_type * np.ones(n_samples, dtype=np.int)
+        )
+        results["tpw"] = (
+            ("samples"), self.tpw * np.ones(n_samples, dtype=np.float)
+        )
+        results["temperature"] = (
+            ("samples",), self.temperature * np.ones(n_samples)
+        )
+
+        return xr.Dataset(results)
 
 def load_data(filename, start=0.0, end=1.0, include_profiles=False):
     """
@@ -177,11 +194,6 @@ def load_data(filename, start=0.0, end=1.0, include_profiles=False):
 ###############################################################################
 # Output file.
 ###############################################################################
-
-
-EXPECTED_DIMENSIONS = {N_FREQS: "channel",
-                       N_LAYERS: "layers",
-                       None: "samples"}
 
 
 class GPROFGMIOutputFile:
@@ -279,43 +291,13 @@ class GPROFGMIOutputFile:
 GPM_FILE_REGEXP = re.compile(r"gpm_(\d\d\d)_(\d\d)(_(\d\d))?_(\d\d).bin")
 
 
-def _process_input(input_filename,
-                   output_file,
-                   start=1.0,
-                   end=1.0,
-                   include_profiles=False):
+def process_input(input_filename,
+                  start=1.0,
+                  end=1.0,
+                  include_profiles=False):
     data = load_data(input_filename, start, end,
                      include_profiles=include_profiles)
-    output_file.add_data(data)
-
-async def process_input(loop,
-                        pool,
-                        input_filename,
-                        output_file,
-                        start=0.0,
-                        end=1.0,
-                        include_profiles=False):
-    """
-    Asynchronous processing of an intput file.
-
-    Args:
-        loop: Event loop to execute in.
-        pool: Executor to use for concurrent processing.
-        input_filename: The input file to process.
-        output_file: The output file object to store the data in.
-        output_file_lock: asyncio.lock to use to gain access to output file.
-        start: Fractional position from which to start reading the data.
-        end: Fractional position up to which to read the data.
-    """
-    await loop.run_in_executor(
-        pool,
-        _process_input,
-        input_filename,
-        output_file,
-        start,
-        end,
-        include_profiles
-    )
+    return data
 
 
 class FileProcessor:
@@ -375,22 +357,18 @@ class FileProcessor:
         pool = ProcessPoolExecutor(max_workers=n_processes)
         loop = asyncio.new_event_loop()
 
-        output_file = GPROFGMIOutputFile(output_file)
-        input_file = GPROFGMIBinFile(self.files[0])
-        output_file.add_attributes(input_file.get_attributes())
 
-        async def coro():
-            tasks = [process_input(loop,
-                                   pool,
-                                   f,
-                                   output_file,
-                                   start=start_fraction,
-                                   end=end_fraction,
-                                   include_profiles=self.include_profiles)
-                     for f in self.files]
-            for t in tqdm.asyncio.tqdm.as_completed(tasks):
-                await t
+        tasks = [pool.submit(process_input,
+                             f,
+                             start=start_fraction,
+                             end=end_fraction,
+                             include_profiles=self.include_profiles)
+                 for f in self.files]
 
-        loop.run_until_complete(coro())
-        loop.close()
+        datasets = []
+        for t in tqdm.tqdm(tasks):
+            datasets.append(t.result())
+
+        dataset = xr.concat(datasets, "samples")
+        dataset.to_netcdf(output_file)
 
