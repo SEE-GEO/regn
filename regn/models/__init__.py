@@ -117,7 +117,13 @@ class GPROFNN0D(nn.Module):
         self.profile_shape = (-1, n_outputs, 28)
 
         super().__init__()
-        self.body = ResNetFC(40, n_neurons, n_neurons, n_layers_body, nn.ReLU)
+        self.body = ResNetFC(
+                40,
+                n_neurons,
+                n_neurons,
+                n_layers_body,
+                nn.ReLU,
+                internal=True)
         self.heads = nn.ModuleDict()
         if exp_activation:
             activation = ClampedExp
