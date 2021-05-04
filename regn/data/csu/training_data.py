@@ -18,6 +18,7 @@ import xarray as xr
 import quantnn
 from quantnn.normalizer import MinMaxNormalizer, Normalizer
 from quantnn.drnn import _to_categorical
+from quantnn.utils import apply
 import quantnn.quantiles as qq
 import quantnn.density as qd
 
@@ -194,7 +195,7 @@ class GPROF0DDataset:
 
         if bins is not None:
             self.binned = True
-            self.y = _to_categorical(self.y, bins)
+            self.y = apply(_to_categorical, self.y, bins)
         else:
             self.binned = False
 
