@@ -925,3 +925,92 @@ class ResultProcessor:
 
         return f
 
+
+def match_gmi_footprints(l1c_data,
+                         source_data,
+                         target_dimensions,
+                         width=2):
+
+    lons = source_data["longitude"]
+    lats = source_data["latitude"]
+    m, n = lats.shape
+    xyz = np.stack(_WGS84_TO_ECEF.transform(lats,
+                                            lons,
+                                            np.zeros_like(lats)), axis=-1)
+    lats_source = lats
+    lons_source = lons
+    xyz = xyz.reshape(-1, 3)
+    kd_tree = KDTree(xyz)
+
+    lons = l1c_data["longitude"]
+    lats = l1c_data["latitude"]
+
+    xyz = np.stack(_WGS84_TO_ECEF.transform(lats, lons, np.zeros_like(lats)), axis=-1)
+    dist, idx = kd_tree.query(xyz.reshape(-1, 3), 1)
+
+    results = {}
+
+    target_dims = {s: l1c_data[t] for s,t in target_dimensions.items()}
+
+    results = source_data.copy().interp(target_dims)
+
+    pixel_index = 0
+    for i in range(lats.shape[0]):
+
+        lat_sc = l1c_data["spacecraft_latitude"][i]
+        lon_sc = l1c_data["spacecraft_longitude"][i]
+        alt_sc = l1c_data["spacecraft_altitude"][i]
+
+        for j in range(lats.shape[1]):
+
+            lat = lats[i, j]
+            lon = lons[i, j]
+            results["latitude"][i, j] = lat
+            results["longitude"][i, j] = lon
+
+            d = dist[pixel_index]
+            pixel_index += 1
+
+            if d > 5e3:
+                for v in results:
+                    results[v][i, j] = np.nan
+                continue
+
+            i_s = idx[pixel_index] // n
+            j_s = idx[pixel_index] % n
+
+            if ((i_s < width) or (i_s > m - width - 1) or
+                (j_s < width) or (j_s > n - width -1)):
+                for v in results:
+                    results[v][i, j] = np.nan
+                continue
+
+            i_start = i_s - width
+            i_end = i_s + width + 1
+            j_start = j_s - width
+            j_end = j_s + width + 1
+
+            lats_w = lats_source[i_start:i_end, j_start:j_end]
+            lons_w = lons_source[i_start:i_end, j_start:j_end]
+
+            FWHM_A = 18e3
+            FWHM_X = 10e3
+
+            weights = calculate_footprint_weights(lats_w,
+                                                  lons_w,
+                                                  lat,
+                                                  lon,
+                                                  lat_sc,
+                                                  lon_sc,
+                                                  alt_sc,
+                                                  FWHM_A,
+                                                  FWHM_X)
+
+            for v in results:
+                if v in ["latitude", "longitude"]:
+                    continue
+                s = source_data[v].data[i_start:i_end, j_start:j_end]
+                shape = weights.shape + (1,) * max(len(s.shape) - 2, 0)
+                results[v][i, j] = (weights.reshape(shape) * s).sum()
+
+    return results

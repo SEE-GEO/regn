@@ -148,28 +148,28 @@ class GPROF0DDataset:
         batch_size=None,
         normalizer=None,
         shuffle=True,
-        bins=None,
+        augment=True,
     ):
         """
         Create GPROF 0D dataset.
 
         Args:
-            filename: Path to the NetCDF file containing the data to
-                 0D training data toload.
+            filename: Path to the NetCDF file containing the 0D training data
+                to load.
             target: The variable to use as target (output) variable.
             normalize: Whether or not to normalize the input data.
             transform_zeros: Whether or not to replace very small
-                 and zero rain with random amounts in the range [1e-6, 1e-4]
+                values with random values.
             batch_size: Number of samples in each training batch.
             shuffle: Whether or not to shuffle the training data.
-            bins: If given, used to transform the training data to categorical
-                 variables by binning using the bin boundaries in ``bins``.
+            augment: Whether or not to randomly mask high-frequency channels.
         """
         self.filename = Path(filename)
         self.target = target
+        self.transform_zeros = transform_zeros
         self.batch_size = batch_size
         self.shuffle = shuffle
-        self.transform_zeros = transform_zeros
+        self.augment = augment
         self._load_data()
 
         indices_1h = list(range(17, 40))
@@ -192,12 +192,6 @@ class GPROF0DDataset:
             self.y = {k: self.y[k].astype(np.float32) for k in self.y}
         else:
             self.y = self.y.astype(np.float32)
-
-        if bins is not None:
-            self.binned = True
-            self.y = apply(_to_categorical, self.y, bins)
-        else:
-            self.binned = False
 
         self._shuffled = False
         if self.shuffle:
@@ -243,21 +237,15 @@ class GPROF0DDataset:
 
             # Brightness temperatures
             m = dataset.dimensions["channel"].size
-            bts = np.zeros((n, m))
-            index_start = 0
-            chunk_size = 256 * 1024
-            v = dataset["brightness_temps"]
-            while index_start < n:
-                index_end = index_start + chunk_size
-                bts[index_start:index_end, :] = v[index_start:index_end, :].data
-                index_start += chunk_size
+            bts = dataset["brightness_temps"][:]
 
             invalid = (bts > 500.0) + (bts < 0.0)
             bts[invalid] = np.nan
 
             # Simulate missing high-frequency channels
-            r = np.random.rand(bts.shape[0])
-            bts[r > 0.8, 10:] = np.nan
+            if self.augment:
+                r = np.random.rand(bts.shape[0])
+                bts[r > 0.8, 10:] = np.nan
 
             # 2m temperature
             t2m = variables["two_meter_temperature"][:].reshape(-1, 1)
@@ -284,26 +272,12 @@ class GPROF0DDataset:
             if isinstance(self.target, list):
                 self.y = {}
                 for l in self.target:
-                    y = np.zeros(variables[l].shape)
-                    chunk_size = 256 * 1024
-                    index_start = 0
-                    v = variables[l]
-                    while index_start < n:
-                        index_end = index_start + chunk_size
-                        y[index_start:index_end] = v[index_start:index_end]
-                        index_start += chunk_size
-                    y[y < -900] = 0.0
+                    y = variables[l][:]
+                    y[y < -900] = -1.0
                     self.y[l] = y
             else:
-                y = np.zeros(variables[target].shape)
-                chunk_size = 256 * 1024
-                index_start = 0
-                v = variables[target]
-                while index_start < n:
-                    index_end = index_start + chunk_size
-                    y[index_start:index_end] = v[index_start:index_end]
-                    index_start += chunk_size
-                y[y < -900] = 0.0
+                y = variables[self.target][:]
+                y[y < -900] = -1.0
                 self.y = y
 
 

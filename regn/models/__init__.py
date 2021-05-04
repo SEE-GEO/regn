@@ -1,93 +1,145 @@
+"""
+regn.models
+===========
+
+
+
+"""
+import numpy as np
 import torch
 from torch import nn
 from torch.nn.functional import softplus
 from regn.data.csu.bin import PROFILE_NAMES
 
-class QuantileHead(nn.Module):
-    def __init__(self, n_inputs, n_quantiles):
+BINS = {
+    "surface_precip": np.logspace(-4.5, 2.5, 129),
+    "convective_precip": np.logspace(-4.5, 2.5, 129),
+    "rain_water_path": np.logspace(-4.5, 2.5, 129),
+    "ice_water_path": np.logspace(-4.5, 2.5, 129),
+    "cloud_water_path": np.logspace(-4.5, 2.5, 129),
+    "total_column_water_vapor": np.logspace(-4.5, 2.5, 129),
+    "cloud_water_content": np.logspace(-5.5, 1.5, 129),
+    "snow_water_content": np.logspace(-5.5, 1.5, 129),
+    "rain_water_content": np.logspace(-5.5, 1.5, 129),
+    "latent_heat": np.linspace(-10, 10, 129)
+}
+
+for k in BINS:
+    if k != "latent_heat":
+        BINS[k][0] == 0.0
+
+QUANTILES = np.linspace(1e-3, 1.0 - 1e-3, 128)
+
+class ClampedExp(nn.Module):
+    """
+    Clamped version of the exponential function that avoids exploding values.
+    """
+    def forward(self, x):
+        return torch.exp(torch.clamp(x, -20, 20))
+
+class ResNetFC(nn.Module):
+    """
+    Fully-connected residual network used as building
+    block in the GPROF-NN-0D algorithm.
+    """
+    def __init__(self,
+                 n_inputs,
+                 n_neurons,
+                 n_outputs,
+                 n_layers,
+                 output_activation=None,
+                 internal=False):
+        """
+        Create network object.
+
+        Args:
+            n_inputs: Number of features in the input vector.
+            n_outputs: Number of output values.
+            n_neurons: Number of neurons in hidden layers.
+            n_layers: Number of layers including the output layer.
+            output_activation: Layer class to use as output activation.
+        """
         super().__init__()
-        self.upper = nn.Linear(n_inputs, n_quantiles // 2)
-        self.median = nn.Linear(n_inputs, 1)
-        self.lower = nn.Linear(n_inputs, n_quantiles // 2)
-        self.odd = n_quantiles % 2 > 0
+        self.layers = nn.ModuleList()
+        self.internal = internal
+        for i in range(n_layers - 1):
+            self.layers.append(
+                nn.Sequential(
+                    nn.Linear(n_inputs, n_neurons),
+                    nn.ReLU()
+                )
+            )
+            n_inputs = n_neurons
+        self.output_layer = nn.Linear(n_inputs, n_outputs)
+        if output_activation is not None:
+            self.output_activation = output_activation()
+        else:
+            self.output_activation = None
 
     def forward(self, x):
-        m = self.median(x)
-        upper = m + torch.cumsum(softplus(self.upper(x)), 1)
-        lower = m - torch.cumsum(softplus(self.lower(x)), 1)
-        if self.odd:
-            return torch.cat([lower, m, upper], 1)
-        return torch.cat([lower, upper], 1)
+        """
+        Forward input through network.
+        """
+        for l in self.layers:
+            y = l(x)
+            y[:, :x.shape[1]] += x
+            x = y
+        y = self.output_layer(x)
+        if self.internal:
+            y[:, :x.shape[1]] += x
+        if self.output_activation:
+            return self.output_activation(y)
+        return y
 
 
 class GPROFNN0D(nn.Module):
     """
     Pytorch neural network model for the GPROF 0D retrieval.
 
-    The model is a simple fully-connected model with multiple heads for each
+    The model is a fully-connected residual network model with multiple heads for each
     of the retrieval targets.
 
     Attributes:
          n_layers: The total number of layers in the network.
          n_neurons: The number of neurons in the hidden layers of the network.
-         n_quantiles: How many quantiles to predict for each retrieval target.
-         target: Single string or dictionary containing the retrieval targets
+         n_outputs: How many quantiles to predict for each retrieval target.
+         target: Single string or list containing the retrieval targets
                to predict.
     """
     def __init__(self,
-                 n_layers,
+                 n_layers_body,
+                 n_layers_head,
                  n_neurons,
-                 n_quantiles,
+                 n_outputs,
                  target="surface_precip",
-                 exp_activation=False,
-                 residuals=True,
-                 batch_norm=False,
-                 quantile_head=False):
-        self.n_layers = n_layers
-        self.n_neurons = n_neurons
-        self.n_quantiles = n_quantiles
+                 exp_activation=False):
         self.target = target
-        self.exp_activation = exp_activation
-        self.quantile_head=quantile_head
-        self.residuals = residuals
+        self.profile_shape = (-1, n_outputs, 28)
 
         super().__init__()
-        self.layers = nn.ModuleList()
-
-        if batch_norm:
-            self.layers.append(nn.Sequential(nn.Linear(40, n_neurons, bias=False),
-                                             nn.BatchNorm1d(n_neurons),
-                                             nn.ReLU()))
-            for i in range(n_layers - 2):
-                self.layers.append(nn.Sequential(
-                    nn.Linear(n_neurons, n_neurons, bias=False),
-                    nn.BatchNorm1d(n_neurons),
-                    nn.ReLU())
-                )
+        self.body = ResNetFC(40, n_neurons, n_neurons, n_layers_body, nn.ReLU)
+        self.heads = nn.ModuleDict()
+        if exp_activation:
+            activation = ClampedExp
         else:
-            self.layers.append(nn.Sequential(nn.Linear(40, n_neurons),
-                                             nn.ReLU()))
-            for i in range(n_layers - 2):
-                self.layers.append(nn.Sequential(
-                    nn.Linear(n_neurons, n_neurons),
-                    nn.ReLU())
-                )
+            activation = None
 
-        if isinstance(self.target, list):
-            self.heads = {}
-            for k in self.target:
-                if k in PROFILE_NAMES:
-                    n_outputs = 28 * n_quantiles
-                else:
-                    n_outputs = n_quantiles
-                if self.quantile_head:
-                    l = QuantileHead(n_neurons, n_outputs)
-                else:
-                    l = nn.Linear(n_neurons, n_outputs)
-                setattr(self, "head_" + k, l)
-                self.heads[k] = l
-        else:
-            self.head = nn.Linear(n_neurons, n_quantiles)
+        if not isinstance(self.target, list):
+            self.target = [self.target]
+
+        for t in self.target:
+            if t in PROFILE_NAMES:
+                self.heads[t] = ResNetFC(n_neurons,
+                                         n_neurons,
+                                         28 * n_outputs,
+                                         n_layers_head,
+                                         output_activation=activation)
+            else:
+                self.heads[t] = ResNetFC(n_neurons,
+                                         n_neurons,
+                                         n_outputs,
+                                         n_layers_head,
+                                         output_activation=activation)
 
     def forward(self, x):
         """
@@ -101,26 +153,15 @@ class GPROFNN0D(nn.Module):
             In the case of a single-target network a single tensor. In
             the case of a multi-target network a dictionary of tensors.
         """
-        for l in self.layers:
-            y = l(x)
-            if self.residuals:
-                y[:, :x.shape[1]] += x
-            x = y
+        y = self.body(x)
 
-        if isinstance(self.target, list):
+        if len(self.target) > 1:
             results = {}
             for k in self.target:
-                if self.exp_activation and k != "latent_heat":
-                    results[k] = torch.exp(self.heads[k](y))
-                else:
-                    results[k] = self.heads[k](y)
-
-                shape = (-1, self.n_quantiles, 28)
+                results[k] = self.heads[k](y)
                 if k in PROFILE_NAMES:
-                    results[k] = results[k].reshape(shape)
+                    results[k] = results[k].reshape(self.profile_shape)
             return results
         else:
-            if self.exp_activation:
-                return torch.exp(self.head(y))
-            else:
-                return self.head(y)
+            t = self.target[0]
+            return self.heads[t](y)

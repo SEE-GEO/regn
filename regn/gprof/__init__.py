@@ -32,7 +32,7 @@ class InputData(Dataset):
         self.scans_per_batch = scans_per_batch
 
         self.n_batches = self.n_scans // scans_per_batch
-        remainder = self.n_scans // scans_per_batch
+        remainder = self.n_scans % scans_per_batch
         if remainder > 0:
             self.n_batches += 1
 
@@ -45,7 +45,8 @@ class InputData(Dataset):
         i_end = (i + 1) * self.scans_per_batch
 
         bts = self.data["brightness_temperatures"][i_start:i_end, :, :].data
-        bts = bts.reshape(-1, N_CHANNELS)
+        bts = bts.reshape(-1, N_CHANNELS).copy()
+        bts[bts < 0] = np.nan
 
         # 2m temperature
         t2m = self.data["two_meter_temperature"][i_start:i_end, :].data
@@ -144,39 +145,61 @@ class InputData(Dataset):
 
     def run_retrieval(self, qrnn):
 
-        mean = np.zeros((self.n_scans, self.n_pixels))
-        first_tertial = np.zeros((self.n_scans, self.n_pixels))
-        second_tertial = np.zeros((self.n_scans, self.n_pixels))
-        pop = np.zeros((self.n_scans, self.n_pixels))
+        means = {}
+        precip_1st_tercile = []
+        precip_3rd_tercile = []
+        pop = []
 
         with torch.no_grad():
             for i in range(len(self)):
                 x = self[i]
-                y = qrnn.predict(x)
 
-                i_start = i * self.scans_per_batch
-                i_end = (i + 1) * self.scans_per_batch
+                y_pred = qrnn.predict(x)
+                if not isinstance(y_pred, dict):
+                    y_pred = {"surface_precip": y_pred}
 
-                means = qrnn.posterior_mean(y_pred=y)
-                mean[i_start:i_end] = means.reshape(-1, self.n_pixels).numpy()
+                y_mean = qrnn.posterior_mean(y_pred=y_pred)
+                for k, y in y_pred.items():
+                    means.setdefault(k, []).append(y_mean[k].cpu().detach().numpy())
+                    if k == "surface_precip":
+                        t = qrnn.posterior_quantiles(y_pred=y,
+                                                     quantiles=[0.333],
+                                                     key=k)
+                        precip_1st_tercile.append(t.cpu().detach().numpy())
+                        t = qrnn.posterior_quantiles(y_pred=y,
+                                                     quantiles=[0.667],
+                                                     key=k)
+                        precip_3rd_tercile.append(t.cpu().detach().numpy())
+                        p = qrnn.probability_larger_than(y_pred=y,
+                                                         y=0.01,
+                                                         key=k)
+                        pop.append(p.cpu().detach().numpy())
 
-                t = qrnn.posterior_quantiles(y_pred=y, quantiles=[0.333])
-                first_tertial[i_start:i_end] = t.reshape(-1, self.n_pixels).numpy()
-                t = qrnn.posterior_quantiles(y_pred=y, quantiles=[0.666])
-                second_tertial[i_start:i_end] = t.reshape(-1, self.n_pixels).numpy()
 
-                p = qrnn.probability_larger_than(y_pred=y, y=0.01)
-                pop[i_start:i_end] = p.reshape(-1, self.n_pixels).numpy()
+        dims = ["scans", "pixels", "levels"]
 
+        data  = {}
+        for k in means:
+            y = np.concatenate(means[k])
+            if y.ndim == 1:
+                y = y.reshape(-1, 221)
+            else:
+                y = y.reshape(-1, 221, 28)
+            data[k] = (dims[:y.ndim], y)
 
-        dims = ["scans", "pixels"]
+        data["precip_1st_tercile"] = (
+            dims[:2],
+            np.concatenate(precip_1st_tercile).reshape(-1, 221)
+        )
+        data["precip_3rd_tercile"] = (
+            dims[:2],
+            np.concatenate(precip_3rd_tercile).reshape(-1, 221)
+        )
+        data["precip_pip"] = (
+            dims[:2],
+            np.concatenate(pop).reshape(-1, 221)
+        )
 
-        data = {
-            "precip_mean": (dims[:2], mean),
-            "precip_1st_tertial": (dims[:2], first_tertial),
-            "precip_3rd_tertial": (dims[:2], second_tertial),
-            "precip_pop": (dims[:2], pop)
-        }
         return xarray.Dataset(data)
 
     def write_retrieval_results(self, path, results):
