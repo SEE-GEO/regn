@@ -245,7 +245,7 @@ class GPROF0DDataset:
             m = dataset.dimensions["channel"].size
             bts = np.zeros((n, m))
             index_start = 0
-            chunk_size = 8192
+            chunk_size = 256 * 1024
             v = dataset["brightness_temps"]
             while index_start < n:
                 index_end = index_start + chunk_size
@@ -253,7 +253,11 @@ class GPROF0DDataset:
                 index_start += chunk_size
 
             invalid = (bts > 500.0) + (bts < 0.0)
-            bts[invalid] = -1.0
+            bts[invalid] = np.nan
+
+            # Simulate missing high-frequency channels
+            r = np.random.rand(bts.shape[0])
+            bts[r > 0.8, 10:] = np.nan
 
             # 2m temperature
             t2m = variables["two_meter_temperature"][:].reshape(-1, 1)
@@ -276,14 +280,32 @@ class GPROF0DDataset:
             # Output data
             #
 
+            n = dataset.dimensions["samples"].size
             if isinstance(self.target, list):
                 self.y = {}
                 for l in self.target:
-                    y = variables[l][:]
-                    y[y < 0.0] = 0.0
+                    y = np.zeros(variables[l].shape)
+                    chunk_size = 256 * 1024
+                    index_start = 0
+                    v = variables[l]
+                    while index_start < n:
+                        index_end = index_start + chunk_size
+                        y[index_start:index_end] = v[index_start:index_end]
+                        index_start += chunk_size
+                    y[y < -900] = 0.0
                     self.y[l] = y
             else:
-                self.y = variables[self.target][:]
+                y = np.zeros(variables[target].shape)
+                chunk_size = 256 * 1024
+                index_start = 0
+                v = variables[target]
+                while index_start < n:
+                    index_end = index_start + chunk_size
+                    y[index_start:index_end] = v[index_start:index_end]
+                    index_start += chunk_size
+                y[y < -900] = 0.0
+                self.y = y
+
 
             LOGGER.info("Loaded %s samples from %s",
                         self.x.shape[0],
