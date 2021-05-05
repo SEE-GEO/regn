@@ -12,23 +12,23 @@ from torch.nn.functional import softplus
 from regn.data.csu.bin import PROFILE_NAMES
 
 BINS = {
-    "surface_precip": np.logspace(-4.5, 2.5, 129),
-    "convective_precip": np.logspace(-4.5, 2.5, 129),
-    "rain_water_path": np.logspace(-4.5, 2.5, 129),
-    "ice_water_path": np.logspace(-4.5, 2.5, 129),
-    "cloud_water_path": np.logspace(-4.5, 2.5, 129),
-    "total_column_water_vapor": np.logspace(-4.5, 2.5, 129),
-    "cloud_water_content": np.logspace(-5.5, 1.5, 129),
-    "snow_water_content": np.logspace(-5.5, 1.5, 129),
-    "rain_water_content": np.logspace(-5.5, 1.5, 129),
-    "latent_heat": np.linspace(-10, 10, 129)
+    "surface_precip": np.logspace(-5.0, 2.5, 257),
+    "convective_precip": np.logspace(-5.0, 2.5, 257),
+    "rain_water_path": np.logspace(-5.0, 2.5, 257),
+    "ice_water_path": np.logspace(-5.0, 2.5, 257),
+    "cloud_water_path": np.logspace(-5.0, 2.5, 257),
+    "total_column_water_vapor": np.logspace(-4.5, 2.5, 257),
+    "cloud_water_content": np.logspace(-6.0, 1.5, 257),
+    "snow_water_content": np.logspace(-6.0, 1.5, 257),
+    "rain_water_content": np.logspace(-6.0, 1.5, 129),
+    "latent_heat": np.linspace(-100, 300, 257)
 }
 
 for k in BINS:
     if k != "latent_heat":
         BINS[k][0] == 0.0
 
-QUANTILES = np.linspace(1e-3, 1.0 - 1e-3, 128)
+QUANTILES = np.linspace(1e-4, 1.0 - 1e-4, 256)
 
 class ClampedExp(nn.Module):
     """

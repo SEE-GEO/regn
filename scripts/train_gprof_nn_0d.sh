@@ -18,4 +18,4 @@ export OMP_NUM_THREADS=4
 cd ${HOME}/src/regn/scripts
 
 
-python train_gprof_nn_0d.py  ${TRAINING_DATA} ${VALIDATION_DATA} ${MODEL_PATH} --n_neurons 256 --n_layers_body 8 --n_layers_head 1 --device cuda:0 --targets ${TARGETS} --type drnn --batch_size 512
+python train_gprof_nn_0d.py  ${TRAINING_DATA} ${VALIDATION_DATA} ${MODEL_PATH} --n_neurons 256 --n_layers_body 8 --n_layers_head 1 --device cuda:0 --targets ${TARGETS} --type qrnn --batch_size 512

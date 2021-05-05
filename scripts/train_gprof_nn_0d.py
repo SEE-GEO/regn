@@ -79,7 +79,7 @@ training_data = DataFolder(
     training_data,
     dataset_factory,
     kwargs=kwargs,
-    n_workers=1)
+    n_workers=2)
 
 kwargs = {
     "batch_size": 8 * batch_size,
@@ -102,7 +102,7 @@ if network_type == "drnn":
     model = GPROFNN0D(n_layers_body,
                       n_layers_head,
                       n_neurons,
-                      128,
+                      256,
                       target=targets,
                       exp_activation=False)
     xrnn = DRNN(BINS, model=model)
@@ -110,15 +110,15 @@ elif network_type == "qrnn_exp":
     model = GPROFNN0D(n_layers_body,
                       n_layers_head,
                       n_neurons,
-                      128,
+                      256,
                       target=targets,
-                      exp_activation=False)
+                      exp_activation=True)
     xrnn = QRNN(QUANTILES, model=model)
 else:
     model = GPROFNN0D(n_layers_body,
                       n_layers_head,
                       n_neurons,
-                      128,
+                      256,
                       target=targets,
                       exp_activation=False)
     xrnn = QRNN(QUANTILES, model=model)
@@ -152,5 +152,5 @@ xrnn.train(training_data=training_data,
            logger=logger,
            metrics=metrics,
            device=device,
-           mask=-1)
+           mask=-9999)
 xrnn.save(model_path / network_name)
