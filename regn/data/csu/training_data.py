@@ -245,7 +245,7 @@ class GPROF0DDataset:
             # Simulate missing high-frequency channels
             if self.augment:
                 r = np.random.rand(bts.shape[0])
-                bts[r > 0.8, 10:] = np.nan
+                bts[r > 0.8, 10:15] = np.nan
 
             # 2m temperature
             t2m = variables["two_meter_temperature"][:].reshape(-1, 1)
@@ -273,11 +273,11 @@ class GPROF0DDataset:
                 self.y = {}
                 for l in self.target:
                     y = variables[l][:]
-                    y[y < -900] = -1.0
+                    y[y < -400] = -9999
                     self.y[l] = y
             else:
                 y = variables[self.target][:]
-                y[y < -900] = -1.0
+                y[y < -400] = -9999
                 self.y = y
 
 
