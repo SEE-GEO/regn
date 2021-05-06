@@ -102,7 +102,7 @@ if network_type == "drnn":
     model = GPROFNN0D(n_layers_body,
                       n_layers_head,
                       n_neurons,
-                      256,
+                      128,
                       target=targets,
                       exp_activation=False)
     xrnn = DRNN(BINS, model=model)
@@ -110,7 +110,7 @@ elif network_type == "qrnn_exp":
     model = GPROFNN0D(n_layers_body,
                       n_layers_head,
                       n_neurons,
-                      256,
+                      128,
                       target=targets,
                       exp_activation=True)
     xrnn = QRNN(QUANTILES, model=model)
@@ -118,7 +118,7 @@ else:
     model = GPROFNN0D(n_layers_body,
                       n_layers_head,
                       n_neurons,
-                      256,
+                      128,
                       target=targets,
                       exp_activation=False)
     xrnn = QRNN(QUANTILES, model=model)
@@ -142,8 +142,8 @@ metrics = ["MeanSquaredError", "Bias", "CalibrationPlot", "CRPS"]
 scatter_plot = ScatterPlot(log_scale=True)
 metrics.append(scatter_plot)
 
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.8, patience=5)
+optimizer = optim.Adam(model.parameters(), lr=0.0005)
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=4)
 xrnn.train(training_data=training_data,
            validation_data=validation_data,
            n_epochs=n_epochs,

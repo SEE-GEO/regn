@@ -12,23 +12,23 @@ from torch.nn.functional import softplus
 from regn.data.csu.bin import PROFILE_NAMES
 
 BINS = {
-    "surface_precip": np.logspace(-5.0, 2.5, 257),
-    "convective_precip": np.logspace(-5.0, 2.5, 257),
-    "rain_water_path": np.logspace(-5.0, 2.5, 257),
-    "ice_water_path": np.logspace(-5.0, 2.5, 257),
-    "cloud_water_path": np.logspace(-5.0, 2.5, 257),
-    "total_column_water_vapor": np.logspace(-4.5, 2.5, 257),
-    "cloud_water_content": np.logspace(-6.0, 1.5, 257),
-    "snow_water_content": np.logspace(-6.0, 1.5, 257),
+    "surface_precip": np.logspace(-5.0, 2.5, 129),
+    "convective_precip": np.logspace(-5.0, 2.5, 129),
+    "rain_water_path": np.logspace(-5.0, 2.5, 129),
+    "ice_water_path": np.logspace(-5.0, 2.5, 129),
+    "cloud_water_path": np.logspace(-5.0, 2.5, 129),
+    "total_column_water_vapor": np.logspace(-4.5, 2.5, 129),
+    "cloud_water_content": np.logspace(-6.0, 1.5, 129),
+    "snow_water_content": np.logspace(-6.0, 1.5, 129),
     "rain_water_content": np.logspace(-6.0, 1.5, 129),
-    "latent_heat": np.linspace(-100, 300, 257)
+    "latent_heat": np.linspace(-100, 300, 129)
 }
 
 for k in BINS:
     if k != "latent_heat":
         BINS[k][0] == 0.0
 
-QUANTILES = np.linspace(1e-4, 1.0 - 1e-4, 256)
+QUANTILES = np.linspace(1e-3, 1.0 - 1e-3, 128)
 
 class ClampedExp(nn.Module):
     """
@@ -65,31 +65,40 @@ class ResNetFC(nn.Module):
         for i in range(n_layers - 1):
             self.layers.append(
                 nn.Sequential(
-                    nn.Linear(n_inputs, n_neurons),
-                    nn.ReLU()
+                    nn.Linear(n_inputs, n_neurons, bias=False),
+                    nn.LayerNorm(n_neurons),
+                    nn.GELU()
                 )
             )
             n_inputs = n_neurons
-        self.output_layer = nn.Linear(n_inputs, n_outputs)
+        self.output_layer = nn.Linear(n_inputs, n_outputs, bias=False)
         if output_activation is not None:
-            self.output_activation = output_activation()
+            self.output_activation = nn.Sequential(
+                    nn.LayerNorm(n_outputs),
+                    output_activation()
+                    )
         else:
             self.output_activation = None
 
-    def forward(self, x):
+    def forward(self, x, acc, li=1):
         """
         Forward input through network.
         """
         for l in self.layers:
             y = l(x)
             y[:, :x.shape[1]] += x
+            if li > 1:
+                y[:, :acc.shape[1]] += (1.0 / (li - 1)) * acc
+            acc[:, :x.shape[1]] += x
+            li += 1
             x = y
         y = self.output_layer(x)
         if self.internal:
             y[:, :x.shape[1]] += x
+            y[:, :acc.shape[1]] += (1.0 / (li - 1)) * acc
         if self.output_activation:
-            return self.output_activation(y)
-        return y
+            return self.output_activation(y), acc
+        return y, acc
 
 
 class GPROFNN0D(nn.Module):
@@ -115,6 +124,8 @@ class GPROFNN0D(nn.Module):
                  exp_activation=False):
         self.target = target
         self.profile_shape = (-1, n_outputs, 28)
+        self.n_layers_body = n_layers_body
+        self.n_neurons = n_neurons
 
         super().__init__()
         self.body = ResNetFC(
@@ -122,7 +133,7 @@ class GPROFNN0D(nn.Module):
                 n_neurons,
                 n_neurons,
                 n_layers_body,
-                nn.ReLU,
+                nn.GELU,
                 internal=True)
         self.heads = nn.ModuleDict()
         if exp_activation:
@@ -131,9 +142,11 @@ class GPROFNN0D(nn.Module):
             activation = None
 
         if not isinstance(self.target, list):
-            self.target = [self.target]
+            targets = [self.target]
+        else:
+            targets = self.target
 
-        for t in self.target:
+        for t in targets:
             if t in PROFILE_NAMES:
                 self.heads[t] = ResNetFC(n_neurons,
                                          n_neurons,
@@ -159,15 +172,18 @@ class GPROFNN0D(nn.Module):
             In the case of a single-target network a single tensor. In
             the case of a multi-target network a dictionary of tensors.
         """
-        y = self.body(x)
-
-        if len(self.target) > 1:
-            results = {}
-            for k in self.target:
-                results[k] = self.heads[k](y)
-                if k in PROFILE_NAMES:
-                    results[k] = results[k].reshape(self.profile_shape)
-            return results
+        if not isinstance(self.target, list):
+            targets = [self.target]
         else:
-            t = self.target[0]
-            return self.heads[t](y)
+            targets = self.target
+
+        acc = torch.zeros(x.shape[0], self.n_neurons, device=x.device, dtype=x.dtype)
+        y, acc = self.body(x, acc)
+        results = {}
+        for k in targets:
+            results[k], _ = self.heads[k](y, acc, self.n_layers_body + 1)
+            if k in PROFILE_NAMES:
+                results[k] = results[k].reshape(self.profile_shape)
+        if not isinstance(self.target, list):
+            return results[self.traget]
+        return results
