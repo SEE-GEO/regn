@@ -62,7 +62,7 @@ batch_size = args.batch_size[0]
 
 model_path = Path(args.model_path[0])
 model_path.mkdir(parents=False, exist_ok=True)
-network_name = f"gprof_nn_0d_gmi_{network_type}_{n_layers_body}_{n_layers_head}_{n_neurons}.pt"
+network_name = f"gprof_nn_0d_gmi_{network_type}_{n_layers_body}_{n_layers_head}_{n_neurons}_full.pt"
 
 #
 # Load the data.
@@ -79,7 +79,7 @@ training_data = DataFolder(
     training_data,
     dataset_factory,
     kwargs=kwargs,
-    n_workers=2)
+    n_workers=4)
 
 kwargs = {
     "batch_size": 8 * batch_size,
@@ -91,7 +91,7 @@ validation_data = DataFolder(
     validation_data,
     dataset_factory,
     kwargs=kwargs,
-    n_workers=1
+    n_workers=2
 )
 
 #

@@ -60,6 +60,8 @@ class ResNetFC(nn.Module):
             output_activation: Layer class to use as output activation.
         """
         super().__init__()
+        self.n_layers = n_layers
+        self.n_neurons = n_neurons
         self.layers = nn.ModuleList()
         self.internal = internal
         for i in range(n_layers - 1):
@@ -80,10 +82,17 @@ class ResNetFC(nn.Module):
         else:
             self.output_activation = None
 
-    def forward(self, x, acc, li=1):
+    def forward(self, x, acc_in, li=1):
         """
         Forward input through network.
         """
+        if self.n_layers == 0:
+            return x, None
+
+        acc = torch.zeros((x.shape[0], self.n_neurons), dtype=x.dtype, device=x.device)
+        if acc_in is not None:
+            acc += acc_in
+
         for l in self.layers:
             y = l(x)
             y[:, :x.shape[1]] += x
@@ -146,15 +155,19 @@ class GPROFNN0D(nn.Module):
         else:
             targets = self.target
 
+        if n_layers_body > 0:
+            n_in = n_neurons
+        else:
+            n_in = 40
         for t in targets:
             if t in PROFILE_NAMES:
-                self.heads[t] = ResNetFC(n_neurons,
+                self.heads[t] = ResNetFC(n_in,
                                          n_neurons,
                                          28 * n_outputs,
                                          n_layers_head,
                                          output_activation=activation)
             else:
-                self.heads[t] = ResNetFC(n_neurons,
+                self.heads[t] = ResNetFC(n_in,
                                          n_neurons,
                                          n_outputs,
                                          n_layers_head,
@@ -177,8 +190,7 @@ class GPROFNN0D(nn.Module):
         else:
             targets = self.target
 
-        acc = torch.zeros(x.shape[0], self.n_neurons, device=x.device, dtype=x.dtype)
-        y, acc = self.body(x, acc)
+        y, acc = self.body(x, None)
         results = {}
         for k in targets:
             results[k], _ = self.heads[k](y, acc, self.n_layers_body + 1)
